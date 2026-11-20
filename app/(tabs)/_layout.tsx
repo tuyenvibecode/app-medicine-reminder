@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { CalendarCheck, Pill, History, Settings } from 'lucide-react-native';
+import { CalendarCheck, Pill, History, User, Settings } from 'lucide-react-native';
 import { useColorScheme } from 'react-native';
 import { COLORS } from '@/theme';
 
@@ -26,7 +26,7 @@ export default function TabLayout() {
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: '600',
         },
       }}
@@ -55,6 +55,15 @@ export default function TabLayout() {
           title: 'Lịch sử',
           tabBarIcon: ({ color, size }) => (
             <History size={size || 22} color={color} strokeWidth={2} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="account"
+        options={{
+          title: 'Tài khoản',
+          tabBarIcon: ({ color, size }) => (
+            <User size={size || 22} color={color} strokeWidth={2} />
           ),
         }}
       />

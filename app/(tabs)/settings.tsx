@@ -158,19 +158,10 @@ export default function SettingsScreen() {
                   Gia đình
                 </Text>
                 <Text className="text-xs text-muted-foreground mt-0.5">
-                  Quản lý thành viên & dược sĩ gia đình
+                  Quản lý thành viên & dược sĩ gia đình ở tab Tài khoản
                 </Text>
               </View>
             </View>
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 px-3 rounded-xl"
-              onPress={() => router.push('/(auth)/login')}
-            >
-              <Text className="text-xs font-semibold text-foreground">Đăng nhập</Text>
-            </Button>
           </View>
         </Card>
 

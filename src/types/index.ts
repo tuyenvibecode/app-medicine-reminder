@@ -3,6 +3,7 @@
 
 export type DoseStatus = 'taken' | 'skipped' | 'missed' | 'upcoming';
 export type TreatmentType = 'ongoing' | 'course'; // 'ongoing' = Dài hạn/mãn tính, 'course' = Theo đợt/liệu trình
+export type FamilyRole = 'patient' | 'pharmacist' | 'admin';
 
 export interface Medication {
   id: string;
@@ -64,4 +65,16 @@ export interface DoseTimelineItem {
   courseDurationMonths?: number;
   lowStockThreshold?: number;
   notes?: string;
+}
+
+export interface FamilyMember {
+  id: string;
+  name: string;
+  relationship: string; // "Bố", "Mẹ", "Vợ (Dược sĩ)", "Chủ hộ"
+  role: FamilyRole;
+  email: string;
+  avatarColor?: string;
+  joinedAt: string;
+  isActive: boolean;
+  inviteCode?: string;
 }

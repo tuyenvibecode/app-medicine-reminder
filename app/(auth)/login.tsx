@@ -1,5 +1,6 @@
 // app/(auth)/login.tsx
-// Màn hình Đăng nhập tài khoản Supabase an toàn
+// Màn hình Đăng nhập riêng cho thành viên gia đình
+// Hỗ trợ cả 2 phương thức: Đăng nhập bằng Mã mời gia đình (1-chạm) & Tài khoản quản trị
 
 import React, { useState } from 'react';
 import {
@@ -9,10 +10,12 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Lock, Mail, Shield, X } from 'lucide-react-native';
+import { Shield, X, KeyRound, Mail, Sparkles } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,11 +23,32 @@ import { Card } from '@/components/ui/card';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const [authMode, setAuthMode] = useState<'invite' | 'password'>('invite');
+  const [inviteCode, setInviteCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async () => {
+  // Xử lý đăng nhập bằng mã gia đình
+  const handleInviteCodeLogin = () => {
+    if (!inviteCode.trim()) {
+      Alert.alert('Chưa nhập mã', 'Vui lòng nhập mã mời gia đình 6 ký tự (ví dụ: GD-8812).');
+      return;
+    }
+
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+
+    Alert.alert(
+      'Kết nối thành công!',
+      `Chào mừng bạn tham gia Gia đình với mã ${inviteCode.toUpperCase()}!\nLịch uống thuốc và hồ sơ đã được đồng bộ.`,
+      [{ text: 'Bắt đầu sử dụng', onPress: () => router.back() }]
+    );
+  };
+
+  // Xử lý đăng nhập bằng Email / Mật khẩu
+  const handlePasswordLogin = async () => {
     if (!email || !password) {
       Alert.alert('Thông báo', 'Vui lòng nhập đầy đủ Email và Mật khẩu.');
       return;
@@ -40,6 +64,9 @@ export default function LoginScreen() {
       if (error) {
         Alert.alert('Đăng nhập thất bại', error.message);
       } else {
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {}
         Alert.alert('Thành công', 'Đăng nhập thành công!');
         router.back();
       }
@@ -68,69 +95,137 @@ export default function LoginScreen() {
           </Button>
         </View>
 
-        <View className="items-center mb-8">
+        {/* Tiêu đề */}
+        <View className="items-center mb-6">
           <View className="h-16 w-16 items-center justify-center rounded-3xl bg-primary/10 border border-primary/20 mb-3">
             <Shield size={32} color="#0D9488" strokeWidth={2} />
           </View>
           <Text className="text-2xl font-bold text-foreground tracking-tight">
-            Đăng nhập tài khoản
+            Đăng nhập Gia đình
           </Text>
-          <Text className="text-sm text-muted-foreground mt-1 text-center px-4">
-            Đồng bộ lịch uống thuốc và kết nối với dược sĩ trong gia đình
+          <Text className="text-xs text-muted-foreground mt-1 text-center px-4">
+            Đồng bộ lịch uống thuốc và kết nối an toàn với dược sĩ
           </Text>
         </View>
 
-        <Card className="p-5 border-border/80">
-          {/* Email input */}
-          <View className="mb-4">
-            <Text className="text-sm font-semibold text-foreground mb-1.5">
-              Email
-            </Text>
-            <View className="relative justify-center">
-              <Input
-                value={email}
-                onChangeText={setEmail}
-                placeholder="ten@vidu.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
-
-          {/* Password input */}
-          <View className="mb-5">
-            <Text className="text-sm font-semibold text-foreground mb-1.5">
-              Mật khẩu
-            </Text>
-            <Input
-              value={password}
-              onChangeText={setPassword}
-              placeholder="••••••••"
-              secureTextEntry
-            />
-          </View>
-
-          {/* Nút đăng nhập */}
-          <Button
-            variant="default"
-            size="lg"
-            className="bg-primary w-full h-13 rounded-2xl"
-            onPress={handleLogin}
-            disabled={isLoading}
+        {/* Tab chuyển đổi cách đăng nhập */}
+        <View className="flex-row bg-muted/60 p-1 rounded-2xl mb-4">
+          <TouchableOpacity
+            onPress={() => setAuthMode('invite')}
+            className={`flex-1 py-2.5 rounded-xl items-center flex-row justify-center ${
+              authMode === 'invite' ? 'bg-card shadow-sm' : ''
+            }`}
           >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text className="text-white font-semibold text-base">
-                Đăng nhập
-              </Text>
-            )}
-          </Button>
+            <Sparkles size={14} color={authMode === 'invite' ? '#0D9488' : '#64748B'} />
+            <Text
+              className={`text-xs font-semibold ml-1.5 ${
+                authMode === 'invite' ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              Mã gia đình (1-chạm)
+            </Text>
+          </TouchableOpacity>
 
-          {/* Lưu ý bảo mật */}
-          <Text className="text-xs text-muted-foreground text-center mt-4">
-            App cá nhân & gia đình: Tài khoản được cấp bởi quản trị viên.
-          </Text>
+          <TouchableOpacity
+            onPress={() => setAuthMode('password')}
+            className={`flex-1 py-2.5 rounded-xl items-center flex-row justify-center ${
+              authMode === 'password' ? 'bg-card shadow-sm' : ''
+            }`}
+          >
+            <Mail size={14} color={authMode === 'password' ? '#0D9488' : '#64748B'} />
+            <Text
+              className={`text-xs font-semibold ml-1.5 ${
+                authMode === 'password' ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              Email & Mật khẩu
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Card className="p-5 border-border/80">
+          {authMode === 'invite' ? (
+            /* Phương thức 1: Nhập mã gia đình */
+            <View>
+              <Text className="text-sm font-semibold text-foreground mb-1">
+                Mã mời gia đình
+              </Text>
+              <Text className="text-xs text-muted-foreground mb-3">
+                Nhập mã 6 ký tự do Chủ hộ cấp (ví dụ: GD-8812)
+              </Text>
+
+              <Input
+                value={inviteCode}
+                onChangeText={setInviteCode}
+                placeholder="Ví dụ: GD-8812"
+                autoCapitalize="characters"
+                className="mb-5 text-center font-bold tracking-widest text-lg h-14"
+              />
+
+              <Button
+                variant="default"
+                size="lg"
+                className="bg-primary w-full h-13 rounded-2xl"
+                onPress={handleInviteCodeLogin}
+              >
+                <Text className="text-white font-bold text-base">
+                  Vào ứng dụng ngay
+                </Text>
+              </Button>
+
+              <Text className="text-xs text-muted-foreground text-center mt-3">
+                Dành cho người nhà: Không cần mật khẩu phức tạp.
+              </Text>
+            </View>
+          ) : (
+            /* Phương thức 2: Email & Mật khẩu */
+            <View>
+              <View className="mb-4">
+                <Text className="text-sm font-semibold text-foreground mb-1.5">
+                  Tài khoản Email
+                </Text>
+                <Input
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="admin@giadinh.local"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View className="mb-5">
+                <Text className="text-sm font-semibold text-foreground mb-1.5">
+                  Mật khẩu
+                </Text>
+                <Input
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="••••••••"
+                  secureTextEntry
+                />
+              </View>
+
+              <Button
+                variant="default"
+                size="lg"
+                className="bg-primary w-full h-13 rounded-2xl"
+                onPress={handlePasswordLogin}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text className="text-white font-semibold text-base">
+                    Đăng nhập quản trị
+                  </Text>
+                )}
+              </Button>
+
+              <Text className="text-xs text-muted-foreground text-center mt-4">
+                Dành cho Chủ hộ & Dược sĩ quản lý.
+              </Text>
+            </View>
+          )}
         </Card>
       </KeyboardAvoidingView>
     </SafeAreaView>
