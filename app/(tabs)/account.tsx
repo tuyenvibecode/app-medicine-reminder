@@ -21,7 +21,7 @@ import {
   Sparkles,
   QrCode,
   Lock,
-  FileText,
+  Settings,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Card } from '@/components/ui/card';
@@ -141,7 +141,9 @@ export default function AccountScreen() {
                       </Text>
                     </View>
                   </View>
-                  <ChevronRight size={20} color="#0D9488" />
+                  <View className="w-6 items-end justify-center">
+                    <ChevronRight size={20} color="#0D9488" />
+                  </View>
                 </View>
               </Card>
             </TouchableOpacity>
@@ -153,10 +155,10 @@ export default function AccountScreen() {
             <Card className="mb-5 p-4 border-border/80">
               {/* Đổi mật khẩu */}
               <TouchableOpacity
-                className="flex-row items-center justify-between py-2 border-b border-border/50"
+                className="flex-row items-center justify-between py-3 border-b border-border/50"
                 onPress={() => Alert.alert('Đổi mật khẩu', 'Tính năng cho phép đổi mật khẩu tài khoản.')}
               >
-                <View className="flex-row items-center">
+                <View className="flex-row items-center flex-1 mr-2">
                   <KeyRound size={18} color="#64748B" />
                   <Text className="text-base font-medium text-foreground ml-3">
                     Đổi mật khẩu tài khoản
@@ -170,7 +172,7 @@ export default function AccountScreen() {
                 className="flex-row items-center justify-between py-3 border-b border-border/50"
                 onPress={() => router.push('/admin' as any)}
               >
-                <View className="flex-row items-center">
+                <View className="flex-row items-center flex-1 mr-2">
                   <QrCode size={18} color="#64748B" />
                   <Text className="text-base font-medium text-foreground ml-3">
                     Mã mời kết nối người nhà
@@ -179,18 +181,18 @@ export default function AccountScreen() {
                 <Badge variant="outline" label="4 thành viên" />
               </TouchableOpacity>
 
-              {/* Dược sĩ Lên đơn thuốc */}
+              {/* Cài đặt ứng dụng & Khoá vân tay */}
               <TouchableOpacity
                 className="flex-row items-center justify-between py-3 border-b border-border/50"
-                onPress={() => router.push('/prescription/create' as any)}
+                onPress={() => router.push('/settings' as any)}
               >
-                <View className="flex-row items-center">
-                  <FileText size={18} color="#0D9488" />
+                <View className="flex-row items-center flex-1 mr-2">
+                  <Settings size={18} color="#0D9488" />
                   <Text className="text-base font-medium text-foreground ml-3">
-                    Lên đơn thuốc & Phiếu note
+                    Cài đặt bảo vệ & Vân tay
                   </Text>
                 </View>
-                <Badge variant="default" label="Kho 2,000+ thuốc" />
+                <ChevronRight size={18} color="#94A3B8" />
               </TouchableOpacity>
 
               {/* Bảo mật RLS */}

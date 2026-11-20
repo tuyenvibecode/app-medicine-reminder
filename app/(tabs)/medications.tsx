@@ -23,7 +23,6 @@ import {
   ShoppingBag,
   Check,
   X,
-  FileText,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Card } from '@/components/ui/card';
@@ -183,35 +182,6 @@ export default function MedicationsScreen() {
             className="flex-1 ml-2.5 text-base text-foreground"
           />
         </View>
-
-        {/* Banner Dược sĩ Lên đơn thuốc (Tra cứu kho 2,000+ thuốc An Khang & xuất phiếu note) */}
-        <TouchableOpacity
-          activeOpacity={0.75}
-          onPress={() => router.push('/prescription/create' as any)}
-          className="mb-4"
-        >
-          <Card className="p-3.5 border-primary/40 bg-card">
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center flex-1 mr-2">
-                <View className="h-11 w-11 rounded-2xl bg-primary/10 border border-primary/25 items-center justify-center">
-                  <FileText size={20} color="#0D9488" strokeWidth={2.2} />
-                </View>
-                <View className="ml-3 flex-1">
-                  <View className="flex-row items-center flex-wrap">
-                    <Text className="text-base font-bold text-foreground mr-1.5">
-                      Dược sĩ Lên đơn thuốc
-                    </Text>
-                    <Badge variant="default" label="Kho 2,000+ thuốc" />
-                  </View>
-                  <Text className="text-xs text-muted-foreground mt-0.5" numberOfLines={1}>
-                    Tra cứu thuốc An Khang, chọn liều/viên & xuất phiếu note
-                  </Text>
-                </View>
-              </View>
-              <ChevronRight size={18} color="#0D9488" />
-            </View>
-          </Card>
-        </TouchableOpacity>
 
         {/* Danh sách thuốc */}
         <ScrollView

@@ -40,9 +40,7 @@ import { Input } from '@/components/ui/input';
 import { searchMedicines } from '@/services/medicineService';
 import type { CatalogMedicine, PrescriptionMedicineItem } from '@/types';
 
-// Danh sách thành viên mẫu trong gia đình
-const FAMILY_MEMBERS = ['Bố (Nguyễn Văn A)', 'Mẹ (Trần Thị B)', 'Tuyến (tuyen55)', 'Bác Ba'];
-const COMMON_DIAGNOSES = ['Cảm cúm, sốt', 'Đau họng, ho có đờm', 'Đau dạ dày', 'Huyết áp cao', 'Viêm xoang', 'Dị ứng thời tiết'];
+// Tuỳ chọn hướng dẫn nhanh khi chọn liều thuốc
 const QUICK_DOSAGE_OPTIONS = [
   'Ngày 2 lần, mỗi lần 1 viên sau ăn',
   'Ngày 3 lần, mỗi lần 1 viên sau ăn',
@@ -57,10 +55,7 @@ export default function CreatePrescriptionScreen() {
   // Tab giao diện: 'builder' (Chọn thuốc) hoặc 'note' (Xem phiếu đơn thuốc hoàn chỉnh)
   const [activeTab, setActiveTab] = useState<'builder' | 'note'>('builder');
 
-  // Thông tin đơn thuốc
-  const [patient, setPatient] = useState(FAMILY_MEMBERS[0]);
-  const [condition, setCondition] = useState('Cảm cúm, sốt');
-  const [pharmacistName, setPharmacistName] = useState('Dược sĩ Thuỳ Linh (Vợ)');
+  // Thông tin đơn thuốc & dặn dò
   const [generalInstructions, setGeneralInstructions] = useState('Uống nhiều nước ấm, nghỉ ngơi điều độ. Kiêng nước đá và đồ cay nóng.');
   const [prescriptionItems, setPrescriptionItems] = useState<PrescriptionMedicineItem[]>([]);
 
@@ -153,7 +148,7 @@ export default function CreatePrescriptionScreen() {
 
     Alert.alert(
       'Lưu đơn thuốc thành công!',
-      `Đã tạo đơn thuốc cho ${patient} với ${prescriptionItems.length} loại thuốc.\nBạn có thể đưa cho người nhà xem hoặc đồng bộ vào lịch nhắc.`,
+      `Đã tạo đơn thuốc với ${prescriptionItems.length} loại thuốc.\nBạn có thể đưa cho người nhà xem hoặc đồng bộ vào lịch nhắc.`,
       [{ text: 'Xem phiếu đơn', onPress: () => setActiveTab('note') }]
     );
   };
@@ -166,7 +161,7 @@ export default function CreatePrescriptionScreen() {
 
     Alert.alert(
       'Đã lên lịch nhắc thuốc!',
-      `Toàn bộ ${prescriptionItems.length} loại thuốc trong đơn đã được tự động thêm vào lịch nhắc hàng ngày của ${patient}.`,
+      `Toàn bộ ${prescriptionItems.length} loại thuốc trong đơn đã được tự động thêm vào lịch nhắc uống thuốc hàng ngày của gia đình.`,
       [{ text: 'Tuyệt vời', onPress: () => router.push('/(tabs)') }]
     );
   };
@@ -176,18 +171,24 @@ export default function CreatePrescriptionScreen() {
       {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-3 border-b border-border/50 bg-card">
         <View className="flex-row items-center flex-1 mr-2">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="h-10 w-10 rounded-full bg-muted/70 items-center justify-center mr-2.5"
-          >
-            <ArrowLeft size={20} color="#0F172A" />
-          </TouchableOpacity>
+          {router.canGoBack() ? (
+            <TouchableOpacity
+              onPress={() => router.back()}
+              className="h-10 w-10 rounded-full bg-muted/70 items-center justify-center mr-2.5"
+            >
+              <ArrowLeft size={20} color="#0F172A" />
+            </TouchableOpacity>
+          ) : (
+            <View className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center mr-2.5">
+              <FileText size={20} color="#0D9488" />
+            </View>
+          )}
           <View>
             <Text className="text-lg font-bold text-foreground">
-              Lên đơn thuốc
+              Tạo đơn thuốc
             </Text>
             <Text className="text-xs text-muted-foreground">
-              Dược sĩ kê toa cho người thân
+              Kê toa nhanh & xuất phiếu note có ảnh
             </Text>
           </View>
         </View>
@@ -228,73 +229,7 @@ export default function CreatePrescriptionScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* 1. Thông tin người bệnh & Chẩn đoán */}
-          <Card className="mb-4 p-4 border-border/80">
-            <View className="flex-row items-center mb-3">
-              <Stethoscope size={18} color="#0D9488" />
-              <Text className="text-base font-bold text-foreground ml-2">
-                Thông tin người nhận đơn
-              </Text>
-            </View>
-
-            {/* Chọn người nhận */}
-            <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-              Người bệnh trong gia đình:
-            </Text>
-            <View className="flex-row flex-wrap gap-2 mb-3.5">
-              {FAMILY_MEMBERS.map((mem) => {
-                const isSelected = patient === mem;
-                return (
-                  <TouchableOpacity
-                    key={mem}
-                    onPress={() => setPatient(mem)}
-                    className={`px-3 py-2 rounded-xl border ${
-                      isSelected ? 'bg-primary/10 border-primary' : 'bg-card border-border'
-                    }`}
-                  >
-                    <Text className={`text-xs font-semibold ${isSelected ? 'text-primary' : 'text-foreground'}`}>
-                      {mem}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Bệnh / Triệu chứng */}
-            <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-              Chẩn đoán / Triệu chứng:
-            </Text>
-            <Input
-              value={condition}
-              onChangeText={setCondition}
-              placeholder="Ví dụ: Cảm cúm, sốt, đau họng..."
-              className="mb-2"
-            />
-
-            <View className="flex-row flex-wrap gap-1.5 mb-3">
-              {COMMON_DIAGNOSES.map((diag) => (
-                <TouchableOpacity
-                  key={diag}
-                  onPress={() => setCondition(diag)}
-                  className="bg-muted/50 px-2.5 py-1 rounded-lg"
-                >
-                  <Text className="text-[11px] text-muted-foreground font-medium">{diag}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Dược sĩ phụ trách */}
-            <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-              Dược sĩ kê đơn:
-            </Text>
-            <Input
-              value={pharmacistName}
-              onChangeText={setPharmacistName}
-              placeholder="Dược sĩ Thuỳ Linh"
-            />
-          </Card>
-
-          {/* 2. Danh sách thuốc ĐÃ CHỌN trong đơn này */}
+          {/* 1. Danh sách thuốc ĐÃ CHỌN trong đơn này (nếu có) */}
           {prescriptionItems.length > 0 && (
             <Card className="mb-4 p-4 border-primary/30 bg-primary/5">
               <View className="flex-row items-center justify-between mb-3 pb-2 border-b border-primary/20">
@@ -476,20 +411,12 @@ export default function CreatePrescriptionScreen() {
                 <Badge variant="default" label="GIA ĐÌNH" />
               </View>
 
-              {/* Thông tin bệnh nhân & người kê */}
-              <View className="mt-4 bg-muted/40 p-3 rounded-2xl">
-                <View className="flex-row justify-between mb-1">
-                  <Text className="text-xs text-muted-foreground">Người nhận thuốc:</Text>
-                  <Text className="text-xs font-bold text-foreground">{patient}</Text>
-                </View>
-                <View className="flex-row justify-between mb-1">
-                  <Text className="text-xs text-muted-foreground">Chẩn đoán / Vấn đề:</Text>
-                  <Text className="text-xs font-bold text-primary">{condition}</Text>
-                </View>
-                <View className="flex-row justify-between">
-                  <Text className="text-xs text-muted-foreground">Dược sĩ phụ trách:</Text>
-                  <Text className="text-xs font-medium text-foreground">{pharmacistName}</Text>
-                </View>
+              {/* Ngày kê đơn */}
+              <View className="mt-3 bg-muted/40 px-3.5 py-2 rounded-xl flex-row items-center justify-between">
+                <Text className="text-xs text-muted-foreground">Thời gian tạo:</Text>
+                <Text className="text-xs font-semibold text-foreground">
+                  {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </Text>
               </View>
             </View>
 

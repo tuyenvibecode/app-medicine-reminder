@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { CalendarCheck, Pill, History, User, Settings } from 'lucide-react-native';
+import { CalendarCheck, Pill, History, User, Settings, FileText } from 'lucide-react-native';
 import { useColorScheme } from 'react-native';
 import { COLORS } from '@/theme';
 
@@ -26,7 +26,7 @@ export default function TabLayout() {
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '600',
         },
       }}
@@ -46,6 +46,16 @@ export default function TabLayout() {
           title: 'Tủ thuốc',
           tabBarIcon: ({ color, size }) => (
             <Pill size={size || 22} color={color} strokeWidth={2} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="prescription"
+        options={{
+          title: 'Tạo đơn thuốc',
+          tabBarLabel: 'Tạo đơn thuốc',
+          tabBarIcon: ({ color, size }) => (
+            <FileText size={size || 22} color={color} strokeWidth={2} />
           ),
         }}
       />
@@ -70,10 +80,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Cài đặt',
-          tabBarIcon: ({ color, size }) => (
-            <Settings size={size || 22} color={color} strokeWidth={2} />
-          ),
+          href: null, // Ẩn khỏi bottom bar, người dùng vào từ tab Tài khoản
         }}
       />
     </Tabs>
