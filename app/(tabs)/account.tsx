@@ -99,12 +99,12 @@ export default function AccountScreen() {
                 <View className="ml-4 flex-1">
                   <View className="flex-row items-center">
                     <Text className="text-lg font-bold text-foreground">
-                      Nguyễn Đạt
+                      Tuyến (tuyen55)
                     </Text>
                     <Badge variant="default" label="Chủ hộ" className="ml-2" />
                   </View>
                   <Text className="text-sm text-muted-foreground mt-0.5">
-                    dat@giadinh.local
+                    tuyen55@giadinh.local
                   </Text>
                   <Text className="text-xs text-primary font-medium mt-1">
                     Quản trị viên gia đình

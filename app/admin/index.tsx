@@ -37,10 +37,10 @@ import type { FamilyMember, FamilyRole } from '@/types';
 const INITIAL_MEMBERS: FamilyMember[] = [
   {
     id: 'u-admin',
-    name: 'Nguyễn Đạt',
+    name: 'Tuyến (tuyen55)',
     relationship: 'Chủ hộ (Bản thân)',
     role: 'admin',
-    email: 'dat@giadinh.local',
+    email: 'tuyen55@giadinh.local',
     joinedAt: '2026-01-10',
     isActive: true,
   },

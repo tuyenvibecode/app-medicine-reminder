@@ -187,7 +187,7 @@ export default function LoginScreen() {
                 <Input
                   value={email}
                   onChangeText={setEmail}
-                  placeholder="admin@giadinh.local"
+                  placeholder="tuyen55@giadinh.local"
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
