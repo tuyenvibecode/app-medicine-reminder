@@ -119,23 +119,24 @@ export default function AccountScreen() {
             </Text>
             <TouchableOpacity
               onPress={() => router.push('/admin' as any)}
-              activeOpacity={0.8}
+              activeOpacity={0.7}
+              className="mb-5"
             >
-              <Card className="mb-5 p-4 border-primary/40 bg-primary/5">
+              <Card className="p-4 border-primary/30 bg-card">
                 <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center flex-1 mr-3">
-                    <View className="h-12 w-12 rounded-2xl bg-primary/15 items-center justify-center">
-                      <Users size={24} color="#0D9488" strokeWidth={2} />
+                  <View className="flex-row items-center flex-1 mr-2">
+                    <View className="h-12 w-12 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center">
+                      <Users size={22} color="#0D9488" strokeWidth={2} />
                     </View>
-                    <View className="ml-3.5 flex-1">
-                      <View className="flex-row items-center">
-                        <Text className="text-base font-bold text-foreground">
+                    <View className="ml-3 flex-1">
+                      <View className="flex-row items-center flex-wrap">
+                        <Text className="text-base font-bold text-foreground mr-2">
                           Trang Quản trị Gia đình
                         </Text>
-                        <Sparkles size={14} color="#0D9488" className="ml-1.5" />
+                        <Badge variant="default" label="Quản trị" />
                       </View>
-                      <Text className="text-xs text-muted-foreground mt-0.5">
-                        Quản lý 4 tài khoản người nhà, cấp mã mời & phân quyền
+                      <Text className="text-xs text-muted-foreground mt-1" numberOfLines={2}>
+                        Quản lý tài khoản người nhà, cấp mã mời & phân quyền
                       </Text>
                     </View>
                   </View>

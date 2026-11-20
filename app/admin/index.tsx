@@ -179,7 +179,7 @@ export default function FamilyAdminScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Thẻ tóm tắt gia đình */}
-        <Card className="mb-5 p-4 border-border/80 bg-primary/5 border-primary/30">
+        <Card className="mb-5 p-4 border-primary/30 bg-card">
           <View className="flex-row items-center justify-between">
             <View>
               <Text className="text-xs font-semibold text-primary uppercase tracking-wider">
