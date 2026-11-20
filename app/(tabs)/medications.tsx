@@ -10,6 +10,7 @@ import {
   TextInput,
   Modal,
   Alert,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,6 +23,7 @@ import {
   ShoppingBag,
   Check,
   X,
+  FileText,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Card } from '@/components/ui/card';
@@ -171,16 +173,45 @@ export default function MedicationsScreen() {
         </View>
 
         {/* Thanh tìm kiếm */}
-        <View className="flex-row items-center bg-card border border-border/80 rounded-2xl px-3.5 h-12 mb-4">
+        <View className="flex-row items-center bg-card border border-border/80 rounded-2xl px-3.5 h-12 mb-3">
           <Search size={18} color="#94A3B8" />
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Tìm theo tên thuốc..."
+            placeholder="Tìm theo tên thuốc trong tủ..."
             placeholderTextColor="#94A3B8"
             className="flex-1 ml-2.5 text-base text-foreground"
           />
         </View>
+
+        {/* Banner Dược sĩ Lên đơn thuốc (Tra cứu kho 2,000+ thuốc An Khang & xuất phiếu note) */}
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() => router.push('/prescription/create' as any)}
+          className="mb-4"
+        >
+          <Card className="p-3.5 border-primary/40 bg-card">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1 mr-2">
+                <View className="h-11 w-11 rounded-2xl bg-primary/10 border border-primary/25 items-center justify-center">
+                  <FileText size={20} color="#0D9488" strokeWidth={2.2} />
+                </View>
+                <View className="ml-3 flex-1">
+                  <View className="flex-row items-center flex-wrap">
+                    <Text className="text-base font-bold text-foreground mr-1.5">
+                      Dược sĩ Lên đơn thuốc
+                    </Text>
+                    <Badge variant="default" label="Kho 2,000+ thuốc" />
+                  </View>
+                  <Text className="text-xs text-muted-foreground mt-0.5" numberOfLines={1}>
+                    Tra cứu thuốc An Khang, chọn liều/viên & xuất phiếu note
+                  </Text>
+                </View>
+              </View>
+              <ChevronRight size={18} color="#0D9488" />
+            </View>
+          </Card>
+        </TouchableOpacity>
 
         {/* Danh sách thuốc */}
         <ScrollView

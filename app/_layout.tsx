@@ -78,6 +78,12 @@ export default function RootLayout() {
                 headerShown: false,
               }}
             />
+            <Stack.Screen
+              name="prescription/create"
+              options={{
+                headerShown: false,
+              }}
+            />
           </Stack>
           <PortalHost />
         </View>

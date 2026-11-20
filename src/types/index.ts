@@ -78,3 +78,44 @@ export interface FamilyMember {
   isActive: boolean;
   inviteCode?: string;
 }
+
+// Kiểu dữ liệu thuốc trong kho tra cứu (từ Nhà thuốc An Khang chi_thuoc.json)
+export interface CatalogMedicine {
+  name: string;
+  brand?: string | null;
+  dosage_form?: string | null;
+  strength?: string | null;
+  image?: string | null;
+  short_usage?: string | null;
+  url?: string | null;
+  classification?: string | null; // "Thuốc không kê đơn" | "Thuốc kê đơn"
+  registration_number?: string | null;
+  manufacturer?: string | null;
+}
+
+// Kiểu dữ liệu 1 loại thuốc trong đơn thuốc kê
+export interface PrescriptionMedicineItem {
+  id: string;
+  name: string;
+  image?: string | null;
+  dosageForm?: string | null;
+  quantity: number; // Số lượng viên/gói kê
+  unit: string; // "viên", "gói", "tuýp", "chai"
+  dosageInstruction: string; // "Ngày 2 lần, mỗi lần 1 viên sau ăn"
+  timingNotes?: string; // Sáng: 1, Trưa: 0, Chiều: 0, Tối: 1
+  durationDays?: number; // Liệu trình: 5 ngày, 7 ngày...
+  notes?: string;
+  classification?: string | null;
+}
+
+// Kiểu dữ liệu Toa / Đơn thuốc hoàn chỉnh
+export interface Prescription {
+  id: string;
+  patientName: string; // Người bệnh (ví dụ: Bố, Mẹ, Bản thân...)
+  condition: string; // Bệnh/triệu chứng: "Cảm cúm sốt, đau họng"
+  doctorOrPharmacist: string; // "Dược sĩ Linh"
+  createdAt: string;
+  medicines: PrescriptionMedicineItem[];
+  instructions?: string; // Dặn dò chung của dược sĩ
+  status: 'active' | 'completed';
+}

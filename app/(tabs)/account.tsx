@@ -21,6 +21,7 @@ import {
   Sparkles,
   QrCode,
   Lock,
+  FileText,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Card } from '@/components/ui/card';
@@ -176,6 +177,20 @@ export default function AccountScreen() {
                   </Text>
                 </View>
                 <Badge variant="outline" label="4 thành viên" />
+              </TouchableOpacity>
+
+              {/* Dược sĩ Lên đơn thuốc */}
+              <TouchableOpacity
+                className="flex-row items-center justify-between py-3 border-b border-border/50"
+                onPress={() => router.push('/prescription/create' as any)}
+              >
+                <View className="flex-row items-center">
+                  <FileText size={18} color="#0D9488" />
+                  <Text className="text-base font-medium text-foreground ml-3">
+                    Lên đơn thuốc & Phiếu note
+                  </Text>
+                </View>
+                <Badge variant="default" label="Kho 2,000+ thuốc" />
               </TouchableOpacity>
 
               {/* Bảo mật RLS */}
