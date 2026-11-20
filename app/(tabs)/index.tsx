@@ -68,6 +68,21 @@ const INITIAL_DOSES: DoseTimelineItem[] = [
     stock: 30,
     lowStockThreshold: 6,
   },
+  {
+    id: '5',
+    scheduleId: 's5',
+    medicationId: 'm-diabetes',
+    medicationName: 'Glucophage XR 500mg (Tiểu đường)',
+    dosage: '1 viên - Sau bữa tối',
+    scheduledTime: '19:30',
+    timeGroup: 'evening',
+    status: 'upcoming',
+    stock: 30,
+    totalCourseStock: 90,
+    courseDurationMonths: 3,
+    treatmentType: 'course',
+    lowStockThreshold: 5,
+  },
 ];
 
 export default function TodayScreen() {

@@ -10,10 +10,13 @@ create table if not exists public.medications (
   dosage text,                       -- ví dụ "500mg - 1 viên"
   notes text,
   color text,                        -- mã màu hoặc tên màu hiển thị
-  stock numeric,                     -- số lượng còn lại
-  low_stock_threshold numeric,       -- ngưỡng cảnh báo sắp hết
+  treatment_type text default 'ongoing',       -- 'ongoing' = Dài hạn mãn tính, 'course' = Theo đợt
+  course_duration_months numeric,              -- thời gian liệu trình (ví dụ 3 tháng)
+  total_course_stock numeric,                  -- tổng số viên cần cho cả đợt điều trị (ví dụ 90)
+  stock numeric,                               -- số lượng thực tế đã mua hiện có (ví dụ 30)
+  low_stock_threshold numeric default 5,       -- ngưỡng cảnh báo sắp hết trong đợt này
   start_date date,
-  end_date date,                     -- null = uống dài hạn
+  end_date date,                               -- null = uống dài hạn
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

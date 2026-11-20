@@ -59,9 +59,14 @@ export function DoseCard({ item, onTake, onSnooze }: DoseCardProps) {
               <Badge variant="secondary" label="Chưa uống" />
             )}
 
-            {item.stock !== undefined && item.lowStockThreshold !== undefined && item.stock <= item.lowStockThreshold && (
+            {item.totalCourseStock ? (
+              <Badge
+                variant={item.stock && item.stock <= (item.lowStockThreshold || 5) ? 'warning' : 'outline'}
+                label={`${item.stock || 0}/${item.totalCourseStock} viên`}
+              />
+            ) : item.stock !== undefined && item.lowStockThreshold !== undefined && item.stock <= item.lowStockThreshold ? (
               <Badge variant="warning" label={`Còn ${item.stock} viên`} />
-            )}
+            ) : null}
           </View>
         </View>
       </View>

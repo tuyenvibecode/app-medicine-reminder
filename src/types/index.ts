@@ -2,6 +2,7 @@
 // Định nghĩa kiểu dữ liệu dùng chung trong toàn bộ app
 
 export type DoseStatus = 'taken' | 'skipped' | 'missed' | 'upcoming';
+export type TreatmentType = 'ongoing' | 'course'; // 'ongoing' = Dài hạn/mãn tính, 'course' = Theo đợt/liệu trình
 
 export interface Medication {
   id: string;
@@ -10,8 +11,11 @@ export interface Medication {
   dosage?: string | null;
   notes?: string | null;
   color?: string | null;
-  stock?: number | null;
-  low_stock_threshold?: number | null;
+  treatment_type?: TreatmentType | null; // Dài hạn hoặc Theo đợt
+  course_duration_months?: number | null; // Liệu trình kéo dài bao nhiêu tháng (ví dụ 3 tháng)
+  total_course_stock?: number | null; // Tổng số viên cần cho cả liệu trình (ví dụ 90 viên)
+  stock?: number | null; // Số lượng thực tế đã mua và hiện có trong tủ (ví dụ 30 viên)
+  low_stock_threshold?: number | null; // Ngưỡng cảnh báo sắp hết trong đợt này (ví dụ 5 viên)
   start_date?: string | null;
   end_date?: string | null;
   is_active: boolean;
@@ -44,7 +48,7 @@ export interface DoseLog {
 export type TimeOfDayGroup = 'morning' | 'noon' | 'afternoon' | 'evening';
 
 export interface DoseTimelineItem {
-  id: string; // duy nhất cho liều trong ngày (thường là scheduleId + dateStr)
+  id: string;
   scheduleId: string;
   medicationId: string;
   medicationName: string;
@@ -55,6 +59,9 @@ export interface DoseTimelineItem {
   color?: string;
   doseLogId?: string;
   stock?: number;
+  totalCourseStock?: number;
+  treatmentType?: TreatmentType;
+  courseDurationMonths?: number;
   lowStockThreshold?: number;
   notes?: string;
 }
