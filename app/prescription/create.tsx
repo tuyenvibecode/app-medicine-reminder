@@ -162,7 +162,10 @@ export default function CreatePrescriptionScreen() {
     Alert.alert(
       'Lưu đơn thuốc thành công!',
       `Đã tạo đơn thuốc với ${prescriptionItems.length} loại thuốc.\nBạn có thể đưa cho người nhà xem hoặc đồng bộ vào lịch nhắc.`,
-      [{ text: 'Xem phiếu đơn', onPress: () => setActiveTab('note') }]
+      [
+        { text: 'Tiếp tục xem phiếu', style: 'cancel' },
+        { text: 'Thêm vào lịch nhắc', onPress: handleSyncToReminders },
+      ]
     );
   };
 
@@ -175,7 +178,7 @@ export default function CreatePrescriptionScreen() {
     Alert.alert(
       'Đã lên lịch nhắc thuốc!',
       `Toàn bộ ${prescriptionItems.length} loại thuốc trong đơn đã được tự động thêm vào lịch nhắc uống thuốc hàng ngày của gia đình.`,
-      [{ text: 'Tuyệt vời', onPress: () => router.push('/(tabs)') }]
+      [{ text: 'Xem Lịch nhắc', onPress: () => router.replace('/(tabs)' as any) }]
     );
   };
 
@@ -186,18 +189,9 @@ export default function CreatePrescriptionScreen() {
         {/* Hàng 1: Tiêu đề thoáng đãng và nút quay lại */}
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center flex-1 mr-2">
-            {router.canGoBack() ? (
-              <TouchableOpacity
-                onPress={() => router.back()}
-                className="h-10 w-10 rounded-full bg-muted/60 items-center justify-center mr-2.5"
-              >
-                <ArrowLeft size={20} color="#0F172A" />
-              </TouchableOpacity>
-            ) : (
-              <View className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center mr-2.5">
-                <FileText size={20} color="#0D9488" strokeWidth={2.2} />
-              </View>
-            )}
+            <View className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center mr-2.5">
+              <FileText size={20} color="#0D9488" strokeWidth={2.2} />
+            </View>
             <View className="flex-1">
               <Text className="text-xl font-bold text-foreground">
                 Tạo đơn thuốc
@@ -279,7 +273,7 @@ export default function CreatePrescriptionScreen() {
           >
           {/* 1. Danh sách thuốc ĐÃ CHỌN trong đơn này - Thiết kế tinh tế, không thô (Fix Ô vuông đỏ 2) */}
           {prescriptionItems.length > 0 && (
-            <Card className="mb-4 p-4 border border-border/80 bg-card rounded-3xl shadow-sm">
+            <Card key="selected-items-card" className="mb-4 p-4 border border-border/80 bg-card rounded-3xl shadow-sm">
               <View className="flex-row items-center justify-between pb-2.5 mb-1 border-b border-border/40">
                 <View className="flex-row items-center">
                   <View className="h-7 w-7 rounded-xl bg-primary/10 items-center justify-center mr-2">
@@ -346,7 +340,7 @@ export default function CreatePrescriptionScreen() {
           )}
 
           {/* 3. Kho tra cứu thuốc từ chi_thuoc.json (Tra cứu Offline siêu tốc) */}
-          <View className="flex-row items-center justify-between mb-2 ml-1">
+          <View key="catalog-header" className="flex-row items-center justify-between mb-2 ml-1">
             <Text className="text-sm font-bold text-foreground">
               Tra cứu thuốc từ kho dữ liệu (An Khang)
             </Text>
@@ -354,7 +348,7 @@ export default function CreatePrescriptionScreen() {
           </View>
 
           {/* Ô tìm kiếm */}
-          <View className="flex-row items-center bg-card border border-border/80 rounded-2xl px-3.5 h-12 mb-3">
+          <View key="catalog-search-bar" className="flex-row items-center bg-card border border-border/80 rounded-2xl px-3.5 h-12 mb-3">
             <Search size={18} color="#94A3B8" />
             <TextInput
               value={searchQuery}
