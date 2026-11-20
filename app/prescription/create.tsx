@@ -30,6 +30,8 @@ import {
   AlertCircle,
   X,
   ChevronDown,
+  ChevronRight,
+  ArrowRight,
   Sparkles,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -81,15 +83,26 @@ export default function CreatePrescriptionScreen() {
     } catch {}
     setSelectedMedicine(med);
 
-    // Tự động nhận diện đơn vị theo dạng bào chế
+    // Tự động nhận diện đơn vị và liều gợi ý theo dạng bào chế
     const form = med.dosage_form || '';
-    if (form.includes('gói')) setUnit('gói');
-    else if (form.includes('Kem') || form.includes('Gel') || form.includes('tuýp')) setUnit('tuýp');
-    else if (form.includes('Dung dịch') || form.includes('chai')) setUnit('chai');
-    else setUnit('viên');
+    if (form.includes('gói')) {
+      setUnit('gói');
+      setQuantity('6');
+      setDosageInstruction('Ngày 2 lần, mỗi lần 1 gói pha nước ấm');
+    } else if (form.includes('Kem') || form.includes('Gel') || form.includes('tuýp')) {
+      setUnit('tuýp');
+      setQuantity('1');
+      setDosageInstruction('Bôi một lớp mỏng ngoài da ngày 2 lần');
+    } else if (form.includes('Dung dịch') || form.includes('chai') || form.includes('Siro')) {
+      setUnit('chai');
+      setQuantity('1');
+      setDosageInstruction('Uống 10ml mỗi lần, ngày 2 lần');
+    } else {
+      setUnit('viên');
+      setQuantity('10');
+      setDosageInstruction('Ngày 2 lần, mỗi lần 1 viên sau ăn');
+    }
 
-    setQuantity('10');
-    setDosageInstruction('Ngày 2 lần, mỗi lần 1 viên sau ăn');
     setDurationDays('5');
     setItemNotes('');
     setModalVisible(true);
@@ -168,133 +181,167 @@ export default function CreatePrescriptionScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-background">
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-3 border-b border-border/50 bg-card">
-        <View className="flex-row items-center flex-1 mr-2">
-          {router.canGoBack() ? (
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="h-10 w-10 rounded-full bg-muted/70 items-center justify-center mr-2.5"
-            >
-              <ArrowLeft size={20} color="#0F172A" />
-            </TouchableOpacity>
-          ) : (
-            <View className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center mr-2.5">
-              <FileText size={20} color="#0D9488" />
+      {/* Header chuẩn: Không bị chèn ép chữ (Fix Ô vuông đỏ 1) */}
+      <View className="px-4 pt-3 pb-3 bg-card border-b border-border/60">
+        {/* Hàng 1: Tiêu đề thoáng đãng và nút quay lại */}
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center flex-1 mr-2">
+            {router.canGoBack() ? (
+              <TouchableOpacity
+                onPress={() => router.back()}
+                className="h-10 w-10 rounded-full bg-muted/60 items-center justify-center mr-2.5"
+              >
+                <ArrowLeft size={20} color="#0F172A" />
+              </TouchableOpacity>
+            ) : (
+              <View className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center mr-2.5">
+                <FileText size={20} color="#0D9488" strokeWidth={2.2} />
+              </View>
+            )}
+            <View className="flex-1">
+              <Text className="text-xl font-bold text-foreground">
+                Tạo đơn thuốc
+              </Text>
+              <Text className="text-xs text-muted-foreground mt-0.5">
+                Kho 2,000+ thuốc An Khang & Phiếu note
+              </Text>
             </View>
-          )}
-          <View>
-            <Text className="text-lg font-bold text-foreground">
-              Tạo đơn thuốc
-            </Text>
-            <Text className="text-xs text-muted-foreground">
-              Kê toa nhanh & xuất phiếu note có ảnh
-            </Text>
           </View>
+
+          {/* Huy hiệu số thuốc đã chọn (bấm xem ngay) */}
+          {prescriptionItems.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setActiveTab(activeTab === 'builder' ? 'note' : 'builder')}
+              className="bg-primary/10 border border-primary/30 px-3 py-1.5 rounded-full flex-row items-center"
+            >
+              <Pill size={13} color="#0D9488" />
+              <Text className="text-xs font-bold text-primary ml-1.5">
+                {activeTab === 'builder' ? `${prescriptionItems.length} thuốc ➔` : 'Kê thêm'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Nút chuyển chế độ: Kê đơn / Xem phiếu note */}
-        <View className="flex-row bg-muted/80 p-1 rounded-xl">
+        {/* Hàng 2: Segmented Control toàn màn hình - Chữ to rõ, không vỡ layout */}
+        <View className="flex-row bg-muted/70 p-1 rounded-2xl mt-3">
           <TouchableOpacity
             onPress={() => setActiveTab('builder')}
-            className={`px-3 py-1.5 rounded-lg ${activeTab === 'builder' ? 'bg-card shadow-sm' : ''}`}
+            className={`flex-1 py-2.5 items-center rounded-xl ${
+              activeTab === 'builder' ? 'bg-card shadow-sm border border-border/40' : ''
+            }`}
           >
-            <Text className={`text-xs font-semibold ${activeTab === 'builder' ? 'text-primary' : 'text-muted-foreground'}`}>
-              Kê thuốc
-            </Text>
+            <View className="flex-row items-center">
+              <Search size={14} color={activeTab === 'builder' ? '#0D9488' : '#64748B'} strokeWidth={2.2} />
+              <Text
+                className={`text-xs font-bold ml-1.5 ${
+                  activeTab === 'builder' ? 'text-primary' : 'text-muted-foreground'
+                }`}
+              >
+                1. Kê & Chọn thuốc
+              </Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => {
               if (prescriptionItems.length === 0) {
-                Alert.alert('Chưa có thuốc', 'Hãy chọn thuốc vào đơn trước khi xem phiếu.');
+                Alert.alert('Chưa có thuốc', 'Vui lòng chọn ít nhất 1 loại thuốc vào đơn trước khi xem phiếu note.');
                 return;
               }
               setActiveTab('note');
             }}
-            className={`px-3 py-1.5 rounded-lg ${activeTab === 'note' ? 'bg-card shadow-sm' : ''}`}
+            className={`flex-1 py-2.5 items-center rounded-xl ${
+              activeTab === 'note' ? 'bg-card shadow-sm border border-border/40' : ''
+            }`}
           >
-            <Text className={`text-xs font-semibold ${activeTab === 'note' ? 'text-primary' : 'text-muted-foreground'}`}>
-              Phiếu note ({prescriptionItems.length})
-            </Text>
+            <View className="flex-row items-center">
+              <FileText size={14} color={activeTab === 'note' ? '#0D9488' : '#64748B'} strokeWidth={2.2} />
+              <Text
+                className={`text-xs font-bold ml-1.5 ${
+                  activeTab === 'note' ? 'text-primary' : 'text-muted-foreground'
+                }`}
+              >
+                2. Phiếu note {prescriptionItems.length > 0 ? `(${prescriptionItems.length})` : ''}
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
 
       {activeTab === 'builder' ? (
         /* ================= CHẾ ĐỘ 1: KÊ THUỐC & TÌM KIẾM ================= */
-        <ScrollView
-          className="flex-1 px-4 pt-3"
-          contentContainerStyle={{ paddingBottom: 100 }}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* 1. Danh sách thuốc ĐÃ CHỌN trong đơn này (nếu có) */}
+        <View className="flex-1">
+          <ScrollView
+            className="flex-1 px-4 pt-3"
+            contentContainerStyle={{ paddingBottom: prescriptionItems.length > 0 ? 110 : 40 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+          {/* 1. Danh sách thuốc ĐÃ CHỌN trong đơn này - Thiết kế tinh tế, không thô (Fix Ô vuông đỏ 2) */}
           {prescriptionItems.length > 0 && (
-            <Card className="mb-4 p-4 border-primary/30 bg-primary/5">
-              <View className="flex-row items-center justify-between mb-3 pb-2 border-b border-primary/20">
+            <Card className="mb-4 p-4 border border-border/80 bg-card rounded-3xl shadow-sm">
+              <View className="flex-row items-center justify-between pb-2.5 mb-1 border-b border-border/40">
                 <View className="flex-row items-center">
-                  <Pill size={18} color="#0D9488" />
-                  <Text className="text-base font-bold text-foreground ml-2">
-                    Thuốc trong đơn ({prescriptionItems.length})
+                  <View className="h-7 w-7 rounded-xl bg-primary/10 items-center justify-center mr-2">
+                    <Pill size={15} color="#0D9488" strokeWidth={2.2} />
+                  </View>
+                  <Text className="text-sm font-bold text-foreground">
+                    Thuốc đã chọn vào đơn ({prescriptionItems.length})
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => setActiveTab('note')}>
-                  <Text className="text-xs font-bold text-primary">Xem phiếu note ➔</Text>
+                <TouchableOpacity
+                  onPress={() => setActiveTab('note')}
+                  className="flex-row items-center bg-primary/10 px-2.5 py-1 rounded-full"
+                >
+                  <Text className="text-xs font-bold text-primary">Xem phiếu note</Text>
+                  <ChevronRight size={13} color="#0D9488" />
                 </TouchableOpacity>
               </View>
 
               {prescriptionItems.map((item, index) => (
                 <View
                   key={item.id}
-                  className="flex-row items-center justify-between py-2.5 border-b border-border/40"
+                  className="flex-row items-center justify-between py-2.5 border-b border-border/30 last:border-b-0"
                 >
                   <View className="flex-row items-center flex-1 mr-2">
-                    <Text className="text-sm font-bold text-primary mr-2">{index + 1}.</Text>
+                    <Text className="text-xs font-bold text-primary mr-2">{index + 1}.</Text>
                     {item.image ? (
                       <Image
                         source={{ uri: item.image }}
-                        className="h-10 w-10 rounded-xl bg-card border border-border"
+                        className="h-11 w-11 rounded-xl bg-muted/20 border border-border/50"
                         contentFit="contain"
                       />
                     ) : (
-                      <View className="h-10 w-10 rounded-xl bg-primary/10 items-center justify-center">
-                        <Pill size={18} color="#0D9488" />
+                      <View className="h-11 w-11 rounded-xl bg-primary/10 items-center justify-center">
+                        <Pill size={20} color="#0D9488" />
                       </View>
                     )}
                     <View className="ml-2.5 flex-1">
-                      <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
+                      <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
                         {item.name}
                       </Text>
-                      <Text className="text-xs text-muted-foreground">
+                      <Text className="text-xs text-muted-foreground mt-0.5" numberOfLines={1}>
                         {item.dosageInstruction}
                       </Text>
                     </View>
                   </View>
 
                   <View className="flex-row items-center">
-                    <Badge variant="default" label={`${item.quantity} ${item.unit}`} />
+                    <View className="bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
+                      <Text className="text-xs font-bold text-primary">
+                        {item.quantity} {item.unit}
+                      </Text>
+                    </View>
                     <TouchableOpacity
                       onPress={() => handleRemoveItem(item.id)}
-                      className="ml-2.5 p-1"
+                      className="ml-2.5 h-8 w-8 rounded-full bg-destructive/10 items-center justify-center"
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Trash2 size={16} color="#EF4444" />
+                      <Trash2 size={15} color="#EF4444" strokeWidth={2} />
                     </TouchableOpacity>
                   </View>
                 </View>
               ))}
-
-              <Button
-                variant="default"
-                size="default"
-                className="bg-primary w-full mt-3 rounded-2xl h-12"
-                onPress={() => setActiveTab('note')}
-              >
-                <FileText size={16} color="#FFFFFF" />
-                <Text className="text-white font-bold ml-2">
-                  Xem & Xuất phiếu đơn thuốc
-                </Text>
-              </Button>
             </Card>
           )}
 
@@ -382,7 +429,37 @@ export default function CreatePrescriptionScreen() {
               </Card>
             );
           })}
-        </ScrollView>
+          </ScrollView>
+
+          {/* Floating Dock Bar khi có thuốc trong đơn */}
+          {prescriptionItems.length > 0 && (
+            <View className="absolute bottom-3 left-4 right-4 z-20">
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => setActiveTab('note')}
+                className="bg-primary flex-row items-center justify-between p-3.5 rounded-2xl shadow-lg border border-primary/40"
+              >
+                <View className="flex-row items-center flex-1 mr-2">
+                  <View className="h-10 w-10 rounded-xl bg-white/20 items-center justify-center mr-3">
+                    <FileText size={20} color="#FFFFFF" strokeWidth={2.2} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-white font-bold text-base">
+                      Đã chọn {prescriptionItems.length} loại thuốc
+                    </Text>
+                    <Text className="text-white/80 text-xs">
+                      Chạm để xem phiếu dặn dò có ảnh
+                    </Text>
+                  </View>
+                </View>
+                <View className="bg-white px-3.5 py-2 rounded-xl flex-row items-center shadow-sm">
+                  <Text className="text-primary font-bold text-xs mr-1">Xem phiếu</Text>
+                  <ArrowRight size={14} color="#0D9488" strokeWidth={2.5} />
+                </View>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       ) : (
         /* ================= CHẾ ĐỘ 2: PHIẾU NOTE TOA THUỐC HOÀN CHỈNH ================= */
         <ScrollView
