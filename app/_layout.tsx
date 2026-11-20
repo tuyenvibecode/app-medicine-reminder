@@ -2,7 +2,7 @@
 // Root layout của ứng dụng Nhắc nhở uống thuốc
 
 import '../global.css';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { View, useColorScheme } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -19,7 +19,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 phút
+      staleTime: 1000 * 60 * 5,
       retry: 1,
     },
   },
@@ -27,22 +27,11 @@ const queryClient = new QueryClient({
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    async function prepare() {
-      try {
-        // Thiết lập channel thông báo local ngay khi khởi động
-        await setupNotificationChannels();
-      } catch (e) {
-        // Log lỗi nhẹ nhàng
-      } finally {
-        setIsReady(true);
-        await SplashScreen.hideAsync().catch(() => {});
-      }
-    }
-
-    prepare();
+    // Ẩn splash screen và thiết lập kênh thông báo ngầm (không chặn hiển thị UI)
+    SplashScreen.hideAsync().catch(() => {});
+    setupNotificationChannels().catch(() => {});
   }, []);
 
   const isDark = colorScheme === 'dark';
@@ -62,14 +51,10 @@ export default function RootLayout() {
         },
       };
 
-  if (!isReady) {
-    return <View className="flex-1 bg-background" />;
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={navigationTheme}>
-        <View className="flex-1 bg-background">
+        <View style={{ flex: 1 }} className="flex-1 bg-background">
           <StatusBar style={isDark ? 'light' : 'dark'} />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

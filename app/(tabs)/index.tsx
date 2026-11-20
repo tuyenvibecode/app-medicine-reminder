@@ -7,9 +7,9 @@ import {
   View,
   Text,
   ScrollView,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Sun, Sunset, Moon, Plus, Sparkles, CheckCircle2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -106,7 +106,7 @@ export default function TodayScreen() {
   const eveningDoses = doses.filter((d) => d.timeGroup === 'evening');
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-background">
       <ScrollView
         className="flex-1 px-4 pt-3"
         contentContainerStyle={{ paddingBottom: 90 }}

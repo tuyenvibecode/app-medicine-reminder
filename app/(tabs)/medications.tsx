@@ -6,9 +6,9 @@ import {
   View,
   Text,
   ScrollView,
-  SafeAreaView,
   TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Pill, Search, Plus, AlertTriangle, ChevronRight } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
@@ -77,7 +77,7 @@ export default function MedicationsScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-background">
       <View className="flex-1 px-4 pt-3">
         {/* Header */}
         <View className="flex-row items-center justify-between pb-3">

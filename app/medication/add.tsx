@@ -6,11 +6,11 @@ import {
   View,
   Text,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
   Alert,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Camera, Image as ImageIcon, X, Clock, Pill, Check } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -99,7 +99,7 @@ export default function AddMedicationScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-background">
       {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-3 border-b border-border/50">
         <Text className="text-xl font-bold text-foreground">Thêm thuốc mới</Text>

@@ -7,10 +7,10 @@ import {
   View,
   Text,
   ScrollView,
-  SafeAreaView,
   Switch,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   ShieldCheck,
@@ -60,7 +60,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-background">
       <ScrollView
         className="flex-1 px-4 pt-3"
         contentContainerStyle={{ paddingBottom: 90 }}

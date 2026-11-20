@@ -2,7 +2,8 @@
 // Màn hình "Lịch sử" uống thuốc và tỷ lệ tuân thủ
 
 import React from 'react';
-import { View, Text, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Flame, CheckCircle, Clock } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -53,7 +54,7 @@ const SAMPLE_LOGS: HistoryLogItem[] = [
 
 export default function HistoryScreen() {
   return (
-    <SafeAreaView className="flex-1 bg-background">
+    <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-background">
       <ScrollView
         className="flex-1 px-4 pt-3"
         contentContainerStyle={{ paddingBottom: 90 }}
