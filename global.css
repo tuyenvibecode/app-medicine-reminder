@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 173 80% 32%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 173 35% 94%;
+    --secondary-foreground: 173 80% 20%;
+    --muted: 210 30% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 173 25% 92%;
+    --accent-foreground: 173 80% 20%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 173 80% 32%;
+    --radius: 16px;
+
+    /* Trạng thái nhắc thuốc */
+    --status-taken: 158 64% 42%;
+    --status-taken-foreground: 0 0% 100%;
+    --status-skipped: 215 16% 50%;
+    --status-skipped-foreground: 0 0% 100%;
+    --status-missed: 0 84% 60%;
+    --status-missed-foreground: 0 0% 100%;
+    --status-upcoming: 173 80% 32%;
+    --status-upcoming-foreground: 0 0% 100%;
+  }
+
+  .dark:root {
+    --background: 192 35% 6%;
+    --foreground: 210 40% 98%;
+    --card: 192 28% 11%;
+    --card-foreground: 210 40% 98%;
+    --popover: 192 28% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 168 76% 46%;
+    --primary-foreground: 192 35% 6%;
+    --secondary: 192 22% 16%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 192 20% 15%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 192 22% 16%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 63% 40%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 192 20% 17%;
+    --input: 192 20% 17%;
+    --ring: 168 76% 46%;
+    --radius: 16px;
+
+    /* Trạng thái nhắc thuốc (dark mode) */
+    --status-taken: 158 64% 42%;
+    --status-taken-foreground: 0 0% 100%;
+    --status-skipped: 215 16% 55%;
+    --status-skipped-foreground: 0 0% 100%;
+    --status-missed: 0 75% 55%;
+    --status-missed-foreground: 0 0% 100%;
+    --status-upcoming: 168 76% 46%;
+    --status-upcoming-foreground: 192 35% 6%;
+  }
+}
