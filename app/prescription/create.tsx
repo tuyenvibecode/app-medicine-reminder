@@ -2,7 +2,7 @@
 // Màn hình Lên đơn thuốc dành cho Dược sĩ gia đình
 // Tìm kiếm thuốc từ data chi_thuoc.json, chọn số lượng viên và xuất Phiếu Note Toa thuốc có ảnh
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
-import { captureRef, releaseCapture } from 'react-native-view-shot';
+import ViewShot, { captureScreen, releaseCapture, type ViewShotRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import {
   Search,
@@ -63,8 +63,21 @@ export default function CreatePrescriptionScreen() {
   const [generalInstructions, setGeneralInstructions] = useState('');
   const [prescriptionItems, setPrescriptionItems] = useState<PrescriptionMedicineItem[]>([]);
   const [isCapturingImage, setIsCapturingImage] = useState(false);
-  // Dùng ComponentRef<typeof View> để tương thích với kiểu View của React 19 / React Native 0.88
-  const noteViewRef = useRef<React.ComponentRef<typeof View>>(null);
+  // Dùng ViewShot component để tránh bị NativeWind v4 bọc View làm lỗi findNodeHandle
+  const noteViewShotRef = useRef<ViewShotRef>(null);
+  const lastTempImageUriRef = useRef<string | null>(null);
+
+  // Tự động dọn dẹp file ảnh tạm khi thoát màn hình để không tốn bộ nhớ máy
+  useEffect(() => {
+    return () => {
+      if (lastTempImageUriRef.current) {
+        try {
+          releaseCapture(lastTempImageUriRef.current);
+        } catch {}
+        lastTempImageUriRef.current = null;
+      }
+    };
+  }, []);
 
   // Tìm kiếm thuốc & bộ lọc thuốc không kê đơn (an toàn y tế rule 04)
   const [searchQuery, setSearchQuery] = useState('');
@@ -245,14 +258,12 @@ export default function CreatePrescriptionScreen() {
     }
   };
 
-  // Chia sẻ phiếu note dưới dạng HÌNH ẢNH (chỉ tạo file tạm trong RAM/cache rồi tự xoá ngay sau khi gửi, không lưu vào DB hay bộ nhớ máy)
+  // Chia sẻ phiếu note dưới dạng HÌNH ẢNH (lưu tạm trong cache để Zalo/Messenger đọc được, tự xoá file cũ và khi thoát màn hình)
   const handleShareNoteImage = async () => {
     if (prescriptionItems.length === 0) {
       Alert.alert('Chưa có thuốc', 'Vui lòng chọn ít nhất một loại thuốc trước khi chia sẻ.');
       return;
     }
-
-    if (!noteViewRef.current) return;
 
     try {
       setIsCapturingImage(true);
@@ -266,26 +277,53 @@ export default function CreatePrescriptionScreen() {
         return;
       }
 
-      // Chụp khung tờ giấy Note ra file ảnh PNG tạm thời (tmpfile)
-      const tmpUri = await captureRef(noteViewRef, {
-        format: 'png',
-        quality: 0.95,
-        result: 'tmpfile',
-      });
-
-      try {
-        await Sharing.shareAsync(tmpUri, {
-          mimeType: 'image/png',
-          dialogTitle: 'Gửi ảnh phiếu mua thuốc',
-        });
-      } finally {
-        // Giải phóng ngay file ảnh tạm để tuyệt đối không làm đầy bộ nhớ máy
+      // Xoá file ảnh tạm của lần chụp trước đó (nếu có) để không tích tụ bộ nhớ
+      if (lastTempImageUriRef.current) {
         try {
-          releaseCapture(tmpUri);
+          releaseCapture(lastTempImageUriRef.current);
         } catch {}
+        lastTempImageUriRef.current = null;
       }
-    } catch {
-      Alert.alert('Thông báo', 'Không thể chụp ảnh phiếu lúc này. Vui lòng thử lại.');
+
+      // Chụp tờ giấy Note qua ViewShot (nếu ViewShot gặp lỗi trên thiết bị thì fallback sang chụp khung màn hình)
+      let tmpUri: string | null = null;
+      if (noteViewShotRef.current && typeof noteViewShotRef.current.capture === 'function') {
+        try {
+          tmpUri = await noteViewShotRef.current.capture();
+        } catch {
+          tmpUri = null;
+        }
+      }
+
+      if (!tmpUri) {
+        tmpUri = await captureScreen({
+          format: 'jpg',
+          quality: 0.92,
+          result: 'tmpfile',
+        });
+      }
+
+      // Đảm bảo đường dẫn có tiền tố file:// cho Android Share Sheet
+      const shareUri =
+        tmpUri.startsWith('file://') || tmpUri.startsWith('content://')
+          ? tmpUri
+          : `file://${tmpUri}`;
+
+      lastTempImageUriRef.current = tmpUri;
+
+      // Lưu ý: Không gọi releaseCapture ngay sau shareAsync vì trên Android shareAsync trả kết quả ngay khi bảng chọn Zalo/Messenger vừa mở.
+      await Sharing.shareAsync(shareUri, {
+        mimeType: 'image/jpeg',
+        UTI: 'public.jpeg',
+        dialogTitle: 'Gửi ảnh phiếu mua thuốc',
+      });
+    } catch (err: any) {
+      Alert.alert(
+        'Không thể tạo ảnh phiếu',
+        err?.message
+          ? `Chi tiết: ${err.message}`
+          : 'Vui lòng thử lại hoặc dùng nút Chia sẻ dạng Chữ bên dưới.'
+      );
     } finally {
       setIsCapturingImage(false);
     }
@@ -709,9 +747,9 @@ export default function CreatePrescriptionScreen() {
             showsVerticalScrollIndicator={false}
           >
             {/* Tờ giấy Note tối giản, rõ ràng để đưa cho dược sĩ ngoài tiệm thuốc */}
-            <View
-              ref={noteViewRef}
-              collapsable={false}
+            <ViewShot
+              ref={noteViewShotRef}
+              options={{ format: 'jpg', quality: 0.95, result: 'tmpfile' }}
               style={{
                 backgroundColor: '#FFFDF7',
                 borderRadius: 20,
@@ -885,7 +923,7 @@ export default function CreatePrescriptionScreen() {
                   }}
                 />
               </View>
-            </View>
+            </ViewShot>
 
             {/* Các nút hành động: Chia sẻ Hình ảnh / Văn bản & Thêm lịch nhắc */}
             <View className="gap-3 mb-6">
