@@ -12,6 +12,7 @@ import {
   TextInput,
   Modal,
   Alert,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -21,13 +22,12 @@ import {
   Plus,
   Trash2,
   FileText,
-  CheckCircle,
-  Stethoscope,
   Pill,
   CalendarCheck,
   AlertCircle,
   X,
   ChevronRight,
+  Share2,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Card } from '@/components/ui/card';
@@ -55,9 +55,8 @@ export default function CreatePrescriptionScreen() {
   const [activeTab, setActiveTab] = useState<'builder' | 'note'>('builder');
 
   // Thông tin đơn thuốc & dặn dò
-  const [generalInstructions, setGeneralInstructions] = useState(
-    'Uống nhiều nước ấm, nghỉ ngơi điều độ. Kiêng nước đá và đồ cay nóng.'
-  );
+  const [noteTitle, setNoteTitle] = useState('Phiếu mua thuốc');
+  const [generalInstructions, setGeneralInstructions] = useState('');
   const [prescriptionItems, setPrescriptionItems] = useState<PrescriptionMedicineItem[]>([]);
 
   // Tìm kiếm thuốc & bộ lọc thuốc không kê đơn (an toàn y tế rule 04)
@@ -200,25 +199,43 @@ export default function CreatePrescriptionScreen() {
     );
   };
 
-  // Lưu đơn thuốc
-  const handleSavePrescription = () => {
+  // Chia sẻ phiếu note mua thuốc qua Zalo / Messenger / Tin nhắn
+  const handleShareNote = async () => {
     if (prescriptionItems.length === 0) {
-      Alert.alert('Chưa có thuốc', 'Vui lòng thêm ít nhất một loại thuốc vào đơn.');
+      Alert.alert('Chưa có thuốc', 'Vui lòng chọn ít nhất một loại thuốc trước khi chia sẻ.');
       return;
     }
 
     try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Haptics.selectionAsync();
     } catch {}
 
-    Alert.alert(
-      'Lưu đơn thuốc thành công!',
-      `Đã tạo đơn thuốc với ${prescriptionItems.length} loại thuốc.\nBạn có thể đưa cho người nhà xem hoặc đồng bộ vào lịch nhắc.`,
-      [
-        { text: 'Tiếp tục xem phiếu', style: 'cancel' },
-        { text: 'Thêm vào lịch nhắc', onPress: handleSyncToReminders },
-      ]
-    );
+    const dateStr = new Date().toLocaleDateString('vi-VN');
+    const lines = prescriptionItems.map((item, idx) => {
+      const usageLine = item.dosageInstruction ? `\n   • Cách dùng: ${item.dosageInstruction}` : '';
+      const noteLine = item.notes ? `\n   • Ghi chú: ${item.notes}` : '';
+      return `${idx + 1}. ${item.name}\n   👉 Mua: ${item.quantity} ${item.unit}${usageLine}${noteLine}`;
+    });
+
+    const extraNote = generalInstructions.trim()
+      ? `\n\n📌 Ghi chú: ${generalInstructions.trim()}`
+      : '';
+
+    const shareMessage =
+      `📝 ${noteTitle.toUpperCase()} (${dateStr})\n` +
+      `------------------------\n` +
+      lines.join('\n\n') +
+      extraNote +
+      `\n------------------------\n(Đưa phiếu này cho dược sĩ tại hiệu thuốc)`;
+
+    try {
+      await Share.share({
+        title: noteTitle,
+        message: shareMessage,
+      });
+    } catch {
+      Alert.alert('Lỗi', 'Không thể mở bảng chia sẻ trên thiết bị này.');
+    }
   };
 
   return (
@@ -631,169 +648,270 @@ export default function CreatePrescriptionScreen() {
             </ScrollView>
           </View>
         ) : (
-          /* ================= CHẾ ĐỘ 2: PHIẾU NOTE TOA THUỐC HOÀN CHỈNH ================= */
+          /* ================= CHẾ ĐỘ 2: GIẤY NOTE MUA THUỐC ĐƠN GIẢN ================= */
           <ScrollView
             key="tab-note-view"
             className="flex-1 px-4 pt-3"
             contentContainerStyle={{ paddingBottom: 100 }}
             showsVerticalScrollIndicator={false}
           >
-            {/* Thẻ Phiếu Note mô phỏng Giấy Kê Toa Dược Sĩ */}
-            <Card className="p-5 border-2 border-primary/30 bg-card rounded-3xl mb-5">
-              {/* Header Phiếu Note */}
-              <View className="border-b-2 border-primary/20 pb-4 mb-4">
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center flex-1 mr-2">
-                    <View className="h-10 w-10 rounded-2xl bg-primary/10 items-center justify-center mr-2.5">
-                      <Stethoscope size={22} color="#0D9488" strokeWidth={2.2} />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-base font-extrabold text-primary tracking-tight">
-                        PHIẾU DẶN DÒ & TOA THUỐC
-                      </Text>
-                      <Text className="text-xs text-muted-foreground">
-                        Dược sĩ gia đình • {new Date().toLocaleDateString('vi-VN')}
-                      </Text>
-                    </View>
-                  </View>
-                  <Badge variant="default" label="GIA ĐÌNH" />
-                </View>
-
-                {/* Ngày kê đơn */}
-                <View className="mt-3 bg-muted/40 px-3.5 py-2 rounded-xl flex-row items-center justify-between">
-                  <Text className="text-xs text-muted-foreground">
-                    Thời gian tạo:
-                  </Text>
-                  <Text className="text-xs font-semibold text-foreground">
-                    {new Date().toLocaleDateString('vi-VN')}
-                  </Text>
-                </View>
+            {/* Tờ giấy Note tối giản, rõ ràng để đưa cho dược sĩ ngoài tiệm thuốc */}
+            <View
+              style={{
+                backgroundColor: '#FFFDF7',
+                borderRadius: 20,
+                padding: 18,
+                borderWidth: 1,
+                borderColor: '#E5E0D0',
+                marginBottom: 16,
+              }}
+            >
+              {/* Tiêu đề giấy Note ngắn gọn */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingBottom: 12,
+                  marginBottom: 12,
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#E5E0D0',
+                  borderStyle: 'dashed',
+                }}
+              >
+                <TextInput
+                  value={noteTitle}
+                  onChangeText={setNoteTitle}
+                  placeholder="Phiếu mua thuốc"
+                  placeholderTextColor="#94A3B8"
+                  style={{
+                    fontSize: 18,
+                    fontWeight: '800',
+                    color: '#0F172A',
+                    flex: 1,
+                    padding: 0,
+                  }}
+                />
+                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>
+                  {new Date().toLocaleDateString('vi-VN')}
+                </Text>
               </View>
 
-              {/* Danh sách thuốc trong phiếu note */}
-              <Text className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2.5">
-                Danh mục thuốc chỉ định ({prescriptionItems.length}):
-              </Text>
-
+              {/* Danh sách thuốc cần mua */}
               {prescriptionItems.map((item, index) => (
                 <View
                   key={item.id}
-                  className="mb-3.5 p-3.5 rounded-2xl bg-muted/20 border border-border/60"
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 12,
+                    borderBottomWidth: index === prescriptionItems.length - 1 ? 0 : 1,
+                    borderBottomColor: '#EFECE2',
+                  }}
                 >
-                  <View className="flex-row items-start justify-between">
-                    {/* Ảnh thuốc */}
-                    <View className="flex-row items-start flex-1 mr-2">
-                      {item.image ? (
-                        <Image
-                          source={{ uri: item.image }}
-                          style={{
-                            width: 56,
-                            height: 56,
-                            borderRadius: 16,
-                            backgroundColor: '#FFFFFF',
-                            borderWidth: 1,
-                            borderColor: '#E2E8F0',
-                          }}
-                          contentFit="contain"
-                        />
-                      ) : (
-                        <View className="h-14 w-14 rounded-2xl bg-primary/10 items-center justify-center">
-                          <Pill size={24} color="#0D9488" />
-                        </View>
-                      )}
+                  {/* Ảnh hộp thuốc to rõ để dược sĩ nhìn nhận diện ngay */}
+                  {item.image ? (
+                    <Image
+                      source={{ uri: item.image }}
+                      style={{
+                        width: 68,
+                        height: 68,
+                        borderRadius: 14,
+                        backgroundColor: '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                      }}
+                      contentFit="contain"
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 68,
+                        height: 68,
+                        borderRadius: 14,
+                        backgroundColor: 'rgba(13, 148, 136, 0.1)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Pill size={28} color="#0D9488" />
+                    </View>
+                  )}
 
-                      <View className="ml-3 flex-1">
-                        <Text className="text-sm font-bold text-foreground leading-snug">
-                          {index + 1}. {item.name}
+                  {/* Tên thuốc, số lượng cần mua & cách dùng */}
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text
+                      style={{
+                        fontSize: 15,
+                        fontWeight: '700',
+                        color: '#0F172A',
+                        lineHeight: 20,
+                      }}
+                    >
+                      {index + 1}. {item.name}
+                    </Text>
+
+                    {/* Số lượng mua nổi bật */}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginTop: 6,
+                      }}
+                    >
+                      <View
+                        style={{
+                          backgroundColor: '#0D9488',
+                          paddingHorizontal: 10,
+                          paddingVertical: 3,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: '#FFFFFF',
+                            fontSize: 13,
+                            fontWeight: '800',
+                          }}
+                        >
+                          Mua: {item.quantity} {item.unit}
                         </Text>
-                        <Text className="text-xs font-bold text-primary mt-1">
-                          👉 Liều dùng: {item.dosageInstruction}
-                        </Text>
-                        {item.notes ? (
-                          <Text className="text-xs text-muted-foreground mt-0.5">
-                            Ghi chú: {item.notes}
-                          </Text>
-                        ) : null}
                       </View>
                     </View>
 
-                    {/* Số lượng viên */}
-                    <View className="items-end">
-                      <Badge
-                        variant="default"
-                        label={`x ${item.quantity} ${item.unit}`}
-                        textClassName="text-xs font-bold"
-                      />
-                      <Text className="text-[10px] text-muted-foreground mt-1">
-                        Dùng {item.durationDays || 5} ngày
+                    {item.dosageInstruction ? (
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: '#475569',
+                          marginTop: 5,
+                        }}
+                      >
+                        • {item.dosageInstruction}
                       </Text>
-                    </View>
+                    ) : null}
+
+                    {item.notes ? (
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: '#64748B',
+                          fontStyle: 'italic',
+                          marginTop: 2,
+                        }}
+                      >
+                        • Ghi chú: {item.notes}
+                      </Text>
+                    ) : null}
                   </View>
                 </View>
               ))}
 
-              {/* Lời dặn dò chung (Cho phép dược sĩ chỉnh sửa trực tiếp) */}
-              <View className="mt-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
-                <Text className="text-xs font-bold text-amber-800 dark:text-amber-300 mb-1.5">
-                  💬 Lời dặn của dược sĩ (chạm để sửa):
-                </Text>
+              {/* Dòng ghi chú tự do dưới cùng giống giấy note */}
+              <View
+                style={{
+                  marginTop: 10,
+                  paddingTop: 12,
+                  borderTopWidth: 1,
+                  borderTopColor: '#E5E0D0',
+                }}
+              >
                 <TextInput
                   value={generalInstructions}
                   onChangeText={setGeneralInstructions}
                   multiline
-                  placeholder="Nhập lời dặn dò cho người nhà..."
+                  placeholder="Ghi chú thêm (ví dụ: Mua cho bố, lấy đúng hãng này...)"
                   placeholderTextColor="#94A3B8"
-                  className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed p-0"
+                  style={{
+                    fontSize: 13,
+                    color: '#334155',
+                    padding: 0,
+                    minHeight: 36,
+                  }}
                 />
               </View>
+            </View>
 
-              {/* Cam kết an toàn y tế (Bắt buộc theo rule 04) */}
-              <View className="mt-4 pt-3 border-t border-border/40">
-                <Text className="text-[11px] text-muted-foreground text-center italic leading-relaxed">
-                  * Chỉ mang tính hỗ trợ trong gia đình. Nếu triệu chứng nặng hoặc kéo dài, hãy đi khám.
-                </Text>
-              </View>
-            </Card>
-
-            {/* Các nút hành động chính */}
+            {/* Các nút hành động: Chia sẻ nhanh qua Zalo/Tin nhắn & Thêm lịch nhắc */}
             <View className="gap-3 mb-6">
-              {/* Nút 1: Thêm ngay vào Lịch nhắc thuốc */}
-              <Button
-                variant="default"
-                size="lg"
-                className="bg-primary w-full h-14 rounded-2xl"
-                onPress={handleSyncToReminders}
+              {/* Nút 1 (Chính): Chia sẻ phiếu cho người khác cầm đi mua */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleShareNote}
+                style={{
+                  backgroundColor: '#0D9488',
+                  height: 54,
+                  borderRadius: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <CalendarCheck size={20} color="#FFFFFF" strokeWidth={2.2} />
-                <Text className="text-white font-bold text-base ml-2">
-                  Thêm tất cả vào Lịch nhắc thuốc
+                <Share2 size={20} color="#FFFFFF" strokeWidth={2.2} />
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontWeight: '700',
+                    fontSize: 16,
+                    marginLeft: 8,
+                  }}
+                >
+                  Chia sẻ phiếu (Zalo / Tin nhắn)
                 </Text>
-              </Button>
+              </TouchableOpacity>
 
-              {/* Nút 2: Lưu đơn thuốc & Quay lại kê thêm */}
+              {/* Hàng nút phụ: Thêm thuốc khác hoặc Đồng bộ vào lịch nhắc */}
               <View className="flex-row gap-2.5">
-                <Button
-                  variant="outline"
-                  size="default"
-                  className="flex-1 h-12 rounded-2xl border-border/80"
+                <TouchableOpacity
+                  activeOpacity={0.8}
                   onPress={handleOpenBuilderView}
+                  style={{
+                    flex: 1,
+                    height: 48,
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: '#CBD5E1',
+                    backgroundColor: '#FFFFFF',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
                 >
-                  <Text className="text-foreground font-semibold text-sm">
-                    + Sửa & Thêm thuốc
+                  <Text
+                    style={{
+                      color: '#0F172A',
+                      fontWeight: '600',
+                      fontSize: 14,
+                    }}
+                  >
+                    + Chọn thêm thuốc
                   </Text>
-                </Button>
+                </TouchableOpacity>
 
-                <Button
-                  variant="secondary"
-                  size="default"
-                  className="flex-1 h-12 rounded-2xl"
-                  onPress={handleSavePrescription}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleSyncToReminders}
+                  style={{
+                    flex: 1,
+                    height: 48,
+                    borderRadius: 16,
+                    backgroundColor: 'rgba(13, 148, 136, 0.12)',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
                 >
-                  <CheckCircle size={16} color="#0D9488" />
-                  <Text className="text-primary font-bold text-sm ml-1.5">
-                    Lưu đơn thuốc
+                  <CalendarCheck size={16} color="#0D9488" strokeWidth={2.2} />
+                  <Text
+                    style={{
+                      color: '#0D9488',
+                      fontWeight: '700',
+                      fontSize: 14,
+                      marginLeft: 6,
+                    }}
+                  >
+                    Lưu vào lịch nhắc
                   </Text>
-                </Button>
+                </TouchableOpacity>
               </View>
             </View>
           </ScrollView>
