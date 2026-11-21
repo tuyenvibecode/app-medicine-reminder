@@ -1,7 +1,7 @@
 // app/(tabs)/_layout.tsx
 // Thanh điều hướng đáy (Custom Floating Bottom Bar)
-// Thiết kế nổi (có khoảng hở 2 bên và dưới đáy), bo tròn kiểu viên nang hiện đại,
-// ở chính giữa là nút Camera nổi bật để chụp nhanh "Đơn thuốc của bạn".
+// Chuẩn tỷ lệ Mobile UI hiện đại: Bo góc vừa phải (18px đồng bộ với Card), khoảng hở 2 bên cân đối (14px),
+// nút Camera squircle (bo góc 15px) tinh tế ở chính giữa để chụp nhanh "Đơn thuốc của bạn".
 
 import React from 'react';
 import { View, Text, TouchableOpacity, useColorScheme, Platform } from 'react-native';
@@ -69,32 +69,21 @@ function CustomFloatingTabBar({ state, navigateToTab, navigation }: CustomTabBar
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          paddingVertical: 6,
+          height: '100%',
         }}
       >
-        <View
-          style={{
-            paddingHorizontal: 12,
-            paddingVertical: 4,
-            borderRadius: 999,
-            backgroundColor: isFocused ? 'rgba(13, 148, 136, 0.12)' : 'transparent',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <IconComponent
-            size={21}
-            color={isFocused ? activeColor : inactiveColor}
-            strokeWidth={isFocused ? 2.4 : 2}
-          />
-        </View>
+        <IconComponent
+          size={20}
+          color={isFocused ? activeColor : inactiveColor}
+          strokeWidth={isFocused ? 2.4 : 1.9}
+        />
         <Text
           numberOfLines={1}
           style={{
-            fontSize: 10.5,
-            fontWeight: isFocused ? '700' : '600',
+            fontSize: 11,
+            fontWeight: isFocused ? '700' : '500',
             color: isFocused ? activeColor : inactiveColor,
-            marginTop: 2,
+            marginTop: 4,
           }}
         >
           {label}
@@ -108,40 +97,40 @@ function CustomFloatingTabBar({ state, navigateToTab, navigation }: CustomTabBar
       pointerEvents="box-none"
       style={{
         position: 'absolute',
-        bottom: Platform.OS === 'ios' ? 22 : 14,
-        left: 16,
-        right: 16,
+        bottom: Platform.OS === 'ios' ? 20 : 12,
+        left: 14,
+        right: 14,
         alignItems: 'center',
       }}
     >
-      {/* Khung viên nang nổi có khoảng hở 2 bên (left: 16, right: 16) */}
+      {/* Thanh điều hướng nổi chuẩn tỷ lệ Mobile UI: bo góc 18px vừa vặn, không bị tròn quá mức */}
       <View
         style={{
           width: '100%',
-          height: 66,
-          borderRadius: 28,
+          height: 62,
+          borderRadius: 18,
           backgroundColor: isDark ? '#121E21' : '#FFFFFF',
           borderWidth: 1,
           borderColor: isDark ? '#1E353B' : '#E2E8F0',
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingHorizontal: 8,
+          paddingHorizontal: 6,
           shadowColor: '#0F172A',
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.12,
-          shadowRadius: 16,
-          elevation: 10,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          elevation: 6,
         }}
       >
         {/* 2 Tab bên trái */}
         {renderTabItem('index', 'Hôm nay', CalendarCheck)}
         {renderTabItem('medications', 'Tủ thuốc', Pill)}
 
-        {/* NÚT CAMERA NỔI Ở CHÍNH GIỮA: Chụp nhanh Đơn thuốc của bạn */}
+        {/* NÚT CAMERA Ở CHÍNH GIỮA: Dạng Squircle (bo góc 14px) đồng bộ với khung 18px của thanh bar */}
         <View
           style={{
-            width: 68,
+            width: 60,
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -151,35 +140,21 @@ function CustomFloatingTabBar({ state, navigateToTab, navigation }: CustomTabBar
             onPress={handleQuickCameraCapture}
             accessibilityLabel="Chụp nhanh đơn thuốc của bạn"
             style={{
-              width: 56,
-              height: 56,
-              borderRadius: 28,
+              width: 46,
+              height: 46,
+              borderRadius: 14,
               backgroundColor: '#0D9488',
               alignItems: 'center',
               justifyContent: 'center',
-              marginTop: -22,
-              borderWidth: 4,
-              borderColor: isDark ? '#121E21' : '#FFFFFF',
               shadowColor: '#0D9488',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.35,
-              shadowRadius: 8,
-              elevation: 8,
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: 0.25,
+              shadowRadius: 6,
+              elevation: 4,
             }}
           >
-            <Camera size={24} color="#FFFFFF" strokeWidth={2.3} />
+            <Camera size={22} color="#FFFFFF" strokeWidth={2.2} />
           </TouchableOpacity>
-          <Text
-            numberOfLines={1}
-            style={{
-              fontSize: 10,
-              fontWeight: '700',
-              color: '#0D9488',
-              marginTop: 2,
-            }}
-          >
-            Chụp đơn
-          </Text>
         </View>
 
         {/* 2 Tab bên phải */}
