@@ -51,7 +51,13 @@ const TODAY_WEEK_INDEX = 12; // Vị trí tuần hiện tại (offset = 0)
 
 export default function TodayScreen() {
   const router = useRouter();
-  const { doses, takeDose, undoTakeDose, snoozeDose } = useAppStore();
+  const {
+    getDosesForDate,
+    isDateCompleted,
+    takeDose,
+    undoTakeDose,
+    snoozeDose,
+  } = useAppStore();
 
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [activeWeekIndex, setActiveWeekIndex] = useState<number>(TODAY_WEEK_INDEX);
@@ -159,20 +165,20 @@ export default function TodayScreen() {
     scrollToWeekIndex(TODAY_WEEK_INDEX, true);
   };
 
-  // Xử lý bấm "Đã uống" 1-chạm
+  // Xử lý bấm "Đã uống" 1-chạm (lưu lịch sử theo đúng ngày đang chọn trên Lịch)
   const handleTakeDose = (item: DoseTimelineItem) => {
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
-    takeDose(item);
+    takeDose(item, selectedDate);
   };
 
-  // Xử lý hoàn tác trạng thái "Đã uống"
+  // Xử lý hoàn tác trạng thái "Đã uống" (theo đúng ngày đang chọn)
   const handleUndoTakeDose = (item: DoseTimelineItem) => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {}
-    undoTakeDose(item);
+    undoTakeDose(item, selectedDate);
   };
 
   // Xử lý hoãn nhắc sau 15 phút
@@ -188,9 +194,10 @@ export default function TodayScreen() {
     );
   };
 
+  const activeDateDoses = getDosesForDate(selectedDate);
   const sortedDoses = useMemo(
-    () => [...doses].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime)),
-    [doses]
+    () => [...activeDateDoses].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime)),
+    [activeDateDoses]
   );
 
   const takenCount = sortedDoses.filter((d) => d.status === 'taken').length;
@@ -410,11 +417,26 @@ export default function TodayScreen() {
                             : item.dayLabel === 'CN'
                             ? '#EF4444'
                             : '#64748B',
-                          marginTop: 7,
+                          marginTop: 6,
                         }}
                       >
                         {item.dayLabel}
                       </Text>
+
+                      {/* Chấm tròn nhỏ báo ngày đã hoàn thành đủ lịch sử uống thuốc */}
+                      <View
+                        style={{
+                          width: 5,
+                          height: 5,
+                          borderRadius: 999,
+                          marginTop: 3,
+                          backgroundColor: isDateCompleted(item.date)
+                            ? isSelected
+                              ? '#FFFFFF'
+                              : '#10B981'
+                            : 'transparent',
+                        }}
+                      />
                     </TouchableOpacity>
                   );
                 })}

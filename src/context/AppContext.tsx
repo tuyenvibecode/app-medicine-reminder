@@ -3,11 +3,12 @@
 // Đơn thuốc bác sĩ kê (ảnh sắc nét) và Cấu hình giờ nhắc & Nhạc chuông.
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { scheduleDailyReminder, scheduleSnoozeNotification } from '@/lib/notifications';
 import type {
   Medication,
   DoseTimelineItem,
+  DoseStatus,
   HistoryLogItem,
   PrescriptionMedicineItem,
   TimeOfDayGroup,
@@ -219,8 +220,11 @@ interface AppContextValue {
   historyLogs: HistoryLogItem[];
   doctorPrescriptions: DoctorPrescription[];
   reminderSettings: ReminderSettings;
-  takeDose: (item: DoseTimelineItem) => void;
-  undoTakeDose: (item: DoseTimelineItem) => void;
+  getDosesForDate: (date: Date) => DoseTimelineItem[];
+  getLogsForDate: (date: Date) => HistoryLogItem[];
+  isDateCompleted: (date: Date) => boolean;
+  takeDose: (item: DoseTimelineItem, date?: Date) => void;
+  undoTakeDose: (item: DoseTimelineItem, date?: Date) => void;
   snoozeDose: (item: DoseTimelineItem) => void;
   refillMedication: (medicationId: string, addCount: number) => void;
   addMedication: (input: AddMedicationInput) => void;
@@ -252,17 +256,115 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     INITIAL_REMINDER_SETTINGS
   );
 
-  // Đánh dấu đã uống thuốc: trừ tồn kho 1 viên và ghi nhận vào lịch sử
-  const takeDose = useCallback((item: DoseTimelineItem) => {
+  // Lưu trạng thái đã uống theo từng ngày 'yyyy-MM-dd' -> { [doseId]: 'taken' | 'upcoming' }
+  const [dateDoseStatusMap, setDateDoseStatusMap] = useState<
+    Record<string, Record<string, DoseStatus>>
+  >(() => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const initialMap: Record<string, Record<string, DoseStatus>> = {
+      [todayKey]: { '1': 'taken' },
+    };
+    // Khởi tạo dữ liệu mẫu lịch sử 7 ngày gần nhất để khi bấm xem lại các ngày trước hiển thị đầy đủ
+    for (let i = 1; i <= 7; i++) {
+      const pastKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
+      initialMap[pastKey] = {
+        '1': 'taken',
+        '2': 'taken',
+        '3': 'taken',
+        '4': 'taken',
+        '5': i === 3 ? 'upcoming' : 'taken', // Ngày thứ 3 trước đó uống 4/5 liều
+      };
+    }
+    return initialMap;
+  });
+
+  // Lấy danh sách liều thuốc kèm trạng thái đúng của ngày được chọn trên Lịch
+  const getDosesForDate = useCallback(
+    (date: Date): DoseTimelineItem[] => {
+      const dateKey = format(date, 'yyyy-MM-dd');
+      const todayKey = format(new Date(), 'yyyy-MM-dd');
+      const statusMapForDate = dateDoseStatusMap[dateKey] || {};
+
+      return doses.map((d) => {
+        if (dateKey === todayKey) {
+          const override = statusMapForDate[d.id];
+          return override ? { ...d, status: override } : d;
+        }
+        if (dateKey > todayKey) {
+          // Ngày trong tương lai: mặc định chưa uống
+          return { ...d, status: statusMapForDate[d.id] || 'upcoming' };
+        }
+        // Ngày trong quá khứ: lấy từ lịch sử ngày đó
+        return {
+          ...d,
+          status: statusMapForDate[d.id] || 'upcoming',
+        };
+      });
+    },
+    [doses, dateDoseStatusMap]
+  );
+
+  // Kiểm tra ngày đó đã uống đủ 100% liều chưa (để hiện chấm hoàn thành trên Lịch tuần)
+  const isDateCompleted = useCallback(
+    (date: Date): boolean => {
+      if (doses.length === 0) return false;
+      const list = getDosesForDate(date);
+      return list.length > 0 && list.every((d) => d.status === 'taken');
+    },
+    [doses.length, getDosesForDate]
+  );
+
+  // Lấy danh sách nhật ký đã uống của một ngày cụ thể
+  const getLogsForDate = useCallback(
+    (date: Date): HistoryLogItem[] => {
+      const todayKey = format(new Date(), 'yyyy-MM-dd');
+      const yesterdayKey = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+      const dateKey = format(date, 'yyyy-MM-dd');
+      const dateDisplay = format(date, 'dd/MM/yyyy');
+
+      return historyLogs.filter((l) => {
+        if (dateKey === todayKey && l.dateStr === 'Hôm nay') return true;
+        if (dateKey === yesterdayKey && l.dateStr === 'Hôm qua') return true;
+        return l.dateStr === dateDisplay;
+      });
+    },
+    [historyLogs]
+  );
+
+  // Đánh dấu đã uống thuốc (hỗ trợ lưu theo đúng ngày đang chọn trên Lịch)
+  const takeDose = useCallback((item: DoseTimelineItem, targetDate?: Date) => {
     if (item.status === 'taken') return;
 
+    const activeDate = targetDate || new Date();
+    const dateKey = format(activeDate, 'yyyy-MM-dd');
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const yesterdayKey = format(subDays(new Date(), 1), 'yyyy-MM-dd');
     const currentTimeStr = format(new Date(), 'HH:mm');
+
+    const dateLabel =
+      dateKey === todayKey
+        ? 'Hôm nay'
+        : dateKey === yesterdayKey
+        ? 'Hôm qua'
+        : format(activeDate, 'dd/MM/yyyy');
+
+    setDateDoseStatusMap((prev) => ({
+      ...prev,
+      [dateKey]: {
+        ...(prev[dateKey] || {}),
+        [item.id]: 'taken',
+      },
+    }));
 
     setDoses((prev) =>
       prev.map((d) => {
         if (d.id === item.id) {
           const nextStock = d.stock !== undefined ? Math.max(0, d.stock - 1) : undefined;
-          return { ...d, status: 'taken', stock: nextStock };
+          return {
+            ...d,
+            status: dateKey === todayKey ? 'taken' : d.status,
+            stock: nextStock,
+          };
         }
         if (d.medicationId === item.medicationId && d.stock !== undefined) {
           return { ...d, stock: Math.max(0, d.stock - 1) };
@@ -292,22 +394,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         medicationName: item.medicationName,
         dosage: item.dosage,
         takenTime: currentTimeStr,
-        dateStr: 'Hôm nay',
+        dateStr: dateLabel,
         status: 'taken',
       },
       ...prev,
     ]);
   }, []);
 
-  // Hoàn tác trạng thái đã uống: cộng lại tồn kho 1 viên và xoá nhật ký vừa ghi
-  const undoTakeDose = useCallback((item: DoseTimelineItem) => {
+  // Hoàn tác trạng thái đã uống (theo đúng ngày đang chọn trên Lịch)
+  const undoTakeDose = useCallback((item: DoseTimelineItem, targetDate?: Date) => {
     if (item.status !== 'taken') return;
+
+    const activeDate = targetDate || new Date();
+    const dateKey = format(activeDate, 'yyyy-MM-dd');
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const yesterdayKey = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+    const dateLabel =
+      dateKey === todayKey
+        ? 'Hôm nay'
+        : dateKey === yesterdayKey
+        ? 'Hôm qua'
+        : format(activeDate, 'dd/MM/yyyy');
+
+    setDateDoseStatusMap((prev) => ({
+      ...prev,
+      [dateKey]: {
+        ...(prev[dateKey] || {}),
+        [item.id]: 'upcoming',
+      },
+    }));
 
     setDoses((prev) =>
       prev.map((d) => {
         if (d.id === item.id) {
           const nextStock = d.stock !== undefined ? d.stock + 1 : undefined;
-          return { ...d, status: 'upcoming', stock: nextStock };
+          return {
+            ...d,
+            status: dateKey === todayKey ? 'upcoming' : d.status,
+            stock: nextStock,
+          };
         }
         if (d.medicationId === item.medicationId && d.stock !== undefined) {
           return { ...d, stock: d.stock + 1 };
@@ -331,7 +456,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
 
     setHistoryLogs((prev) => {
-      const idx = prev.findIndex((l) => l.doseId === item.id && l.dateStr === 'Hôm nay');
+      const idx = prev.findIndex((l) => l.doseId === item.id && l.dateStr === dateLabel);
       if (idx === -1) return prev;
       const copy = [...prev];
       copy.splice(idx, 1);
@@ -533,6 +658,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         historyLogs,
         doctorPrescriptions,
         reminderSettings,
+        getDosesForDate,
+        getLogsForDate,
+        isDateCompleted,
         takeDose,
         undoTakeDose,
         snoozeDose,
