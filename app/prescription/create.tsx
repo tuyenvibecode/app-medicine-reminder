@@ -28,7 +28,6 @@ import {
   AlertCircle,
   X,
   ChevronRight,
-  ArrowRight,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Card } from '@/components/ui/card';
@@ -244,11 +243,12 @@ export default function CreatePrescriptionScreen() {
 
           {/* Huy hiệu số thuốc đã chọn (bấm chuyển đổi nhanh) */}
           {prescriptionItems.length > 0 && (
-            <Pressable
+            <TouchableOpacity
+              activeOpacity={0.75}
               onPress={() =>
                 activeTab === 'builder' ? handleOpenNoteView() : handleOpenBuilderView()
               }
-              hitSlop={8}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={{
                 backgroundColor: 'rgba(13, 148, 136, 0.12)',
                 borderColor: 'rgba(13, 148, 136, 0.35)',
@@ -261,34 +261,36 @@ export default function CreatePrescriptionScreen() {
               }}
             >
               <Pill size={13} color="#0D9488" />
-              <Text className="text-xs font-bold text-primary ml-1.5">
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '700',
+                  color: '#0D9488',
+                  marginLeft: 6,
+                }}
+              >
                 {activeTab === 'builder' ? `${prescriptionItems.length} thuốc ➔` : '← Kê thêm'}
               </Text>
-            </Pressable>
+            </TouchableOpacity>
           )}
         </View>
 
-        {/* Hàng 2: Segmented Control dùng inline style cho trạng thái active để không gây remount */}
+        {/* Hàng 2: Segmented Control chuyển đổi giữa Kê thuốc và Phiếu note */}
         <View className="flex-row bg-muted/70 p-1 rounded-2xl mt-3">
-          <Pressable
+          <TouchableOpacity
+            activeOpacity={0.8}
             onPress={handleOpenBuilderView}
-            style={[
-              {
-                flex: 1,
-                paddingVertical: 10,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 12,
-                flexDirection: 'row',
-              },
-              activeTab === 'builder'
-                ? {
-                    backgroundColor: '#FFFFFF',
-                    borderWidth: 1,
-                    borderColor: 'rgba(226, 232, 240, 0.8)',
-                  }
-                : null,
-            ]}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 12,
+              flexDirection: 'row',
+              backgroundColor: activeTab === 'builder' ? '#FFFFFF' : 'transparent',
+              borderWidth: activeTab === 'builder' ? 1 : 0,
+              borderColor: activeTab === 'builder' ? '#E2E8F0' : 'transparent',
+            }}
           >
             <Search
               size={14}
@@ -305,27 +307,22 @@ export default function CreatePrescriptionScreen() {
             >
               1. Kê & Chọn thuốc
             </Text>
-          </Pressable>
+          </TouchableOpacity>
 
-          <Pressable
+          <TouchableOpacity
+            activeOpacity={0.8}
             onPress={handleOpenNoteView}
-            style={[
-              {
-                flex: 1,
-                paddingVertical: 10,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 12,
-                flexDirection: 'row',
-              },
-              activeTab === 'note'
-                ? {
-                    backgroundColor: '#FFFFFF',
-                    borderWidth: 1,
-                    borderColor: 'rgba(226, 232, 240, 0.8)',
-                  }
-                : null,
-            ]}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 12,
+              flexDirection: 'row',
+              backgroundColor: activeTab === 'note' ? '#FFFFFF' : 'transparent',
+              borderWidth: activeTab === 'note' ? 1 : 0,
+              borderColor: activeTab === 'note' ? '#E2E8F0' : 'transparent',
+            }}
           >
             <FileText
               size={14}
@@ -342,7 +339,7 @@ export default function CreatePrescriptionScreen() {
             >
               2. Phiếu note {prescriptionItems.length > 0 ? `(${prescriptionItems.length})` : ''}
             </Text>
-          </Pressable>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -353,9 +350,7 @@ export default function CreatePrescriptionScreen() {
           <View key="tab-builder-view" className="flex-1">
             <ScrollView
               className="flex-1 px-4 pt-3"
-              contentContainerStyle={{
-                paddingBottom: prescriptionItems.length > 0 ? 120 : 40,
-              }}
+              contentContainerStyle={{ paddingBottom: 40 }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
@@ -370,13 +365,14 @@ export default function CreatePrescriptionScreen() {
                       <View className="h-7 w-7 rounded-xl bg-primary/10 items-center justify-center mr-2">
                         <Pill size={15} color="#0D9488" strokeWidth={2.2} />
                       </View>
-                      <Text className="text-sm font-bold text-foreground">
-                        Thuốc đã chọn vào đơn ({prescriptionItems.length})
+                      <Text className="text-sm font-bold text-foreground flex-1" numberOfLines={1}>
+                        Thuốc đã chọn ({prescriptionItems.length})
                       </Text>
                     </View>
-                    <Pressable
+                    <TouchableOpacity
+                      activeOpacity={0.75}
                       onPress={handleOpenNoteView}
-                      hitSlop={10}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
@@ -386,9 +382,11 @@ export default function CreatePrescriptionScreen() {
                         borderRadius: 999,
                       }}
                     >
-                      <Text className="text-xs font-bold text-primary">Xem phiếu note</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#0D9488' }}>
+                        Xem phiếu note
+                      </Text>
                       <ChevronRight size={13} color="#0D9488" />
-                    </Pressable>
+                    </TouchableOpacity>
                   </View>
 
                   {prescriptionItems.map((item, index) => (
@@ -631,78 +629,6 @@ export default function CreatePrescriptionScreen() {
                 );
               })}
             </ScrollView>
-
-            {/* Thanh Floating Dock Bar khi có thuốc trong đơn - Dùng Pressable + elevation trực tiếp */}
-            {prescriptionItems.length > 0 && (
-              <View
-                style={{
-                  position: 'absolute',
-                  bottom: 12,
-                  left: 16,
-                  right: 16,
-                  zIndex: 50,
-                  elevation: 10,
-                }}
-              >
-                <Pressable
-                  onPress={handleOpenNoteView}
-                  style={({ pressed }) => ({
-                    backgroundColor: '#0D9488',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: 14,
-                    borderRadius: 18,
-                    opacity: pressed ? 0.92 : 1,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 8,
-                    elevation: 8,
-                  })}
-                >
-                  <View className="flex-row items-center flex-1 mr-2">
-                    <View
-                      style={{
-                        height: 40,
-                        width: 40,
-                        borderRadius: 12,
-                        backgroundColor: 'rgba(255,255,255,0.2)',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginRight: 12,
-                      }}
-                    >
-                      <FileText size={20} color="#FFFFFF" strokeWidth={2.2} />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-white font-bold text-base">
-                        Đã chọn {prescriptionItems.length} loại thuốc
-                      </Text>
-                      <Text className="text-white/80 text-xs">
-                        Chạm để xem phiếu dặn dò có ảnh
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View
-                    style={{
-                      backgroundColor: '#FFFFFF',
-                      paddingHorizontal: 14,
-                      paddingVertical: 9,
-                      borderRadius: 12,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text className="text-primary font-bold text-xs mr-1">
-                      Xem phiếu
-                    </Text>
-                    <ArrowRight size={14} color="#0D9488" strokeWidth={2.5} />
-                  </View>
-                </Pressable>
-              </View>
-            )}
           </View>
         ) : (
           /* ================= CHẾ ĐỘ 2: PHIẾU NOTE TOA THUỐC HOÀN CHỈNH ================= */
