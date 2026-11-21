@@ -2,9 +2,10 @@
 // Quản lý trạng thái trung tâm của ứng dụng: Tủ thuốc, Lịch nhắc hôm nay, Lịch sử uống,
 // Đơn thuốc bác sĩ kê (ảnh sắc nét) và Cấu hình giờ nhắc & Nhạc chuông.
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { format, subDays } from 'date-fns';
 import { scheduleDailyReminder, scheduleSnoozeNotification } from '@/lib/notifications';
+import { loadReminderSettings, saveReminderSettings } from '@/lib/securityConfig';
 import type {
   Medication,
   DoseTimelineItem,
@@ -255,6 +256,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(
     INITIAL_REMINDER_SETTINGS
   );
+
+  // Tự động tải lại cấu hình giờ nhắc & nhạc chuông đã lưu trên thiết bị khi mở app
+  useEffect(() => {
+    loadReminderSettings().then((saved) => {
+      if (saved) {
+        setReminderSettings((prev) => ({ ...prev, ...saved }));
+      }
+    });
+  }, []);
 
   // Lưu trạng thái đã uống theo từng ngày 'yyyy-MM-dd' -> { [doseId]: 'taken' | 'upcoming' }
   const [dateDoseStatusMap, setDateDoseStatusMap] = useState<
@@ -661,7 +671,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateReminderSettings = useCallback((patch: Partial<ReminderSettings>) => {
-    setReminderSettings((prev) => ({ ...prev, ...patch }));
+    setReminderSettings((prev) => {
+      const next = { ...prev, ...patch };
+      saveReminderSettings(next).catch(() => {});
+      return next;
+    });
   }, []);
 
   return (

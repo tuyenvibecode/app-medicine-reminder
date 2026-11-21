@@ -3,9 +3,11 @@
 // Tuân thủ rule 01-security.md: không dùng AsyncStorage cho dữ liệu bảo mật.
 
 import { LargeSecureStoreAdapter } from './secureStorage';
+import type { ReminderSettings } from '@/types';
 
 const KEY_BIOMETRICS_ENABLED = 'sec_biometrics_enabled';
 const KEY_PRIVACY_SHIELD_ENABLED = 'sec_privacy_shield_enabled';
+const KEY_REMINDER_SETTINGS = 'app_reminder_settings_v1';
 
 export interface SecurityPreferences {
   biometricsEnabled: boolean;
@@ -38,4 +40,20 @@ export async function saveBiometricsEnabled(enabled: boolean): Promise<void> {
 
 export async function savePrivacyShieldEnabled(enabled: boolean): Promise<void> {
   await LargeSecureStoreAdapter.setItem(KEY_PRIVACY_SHIELD_ENABLED, enabled ? 'true' : 'false');
+}
+
+export async function loadReminderSettings(): Promise<Partial<ReminderSettings> | null> {
+  try {
+    const raw = await LargeSecureStoreAdapter.getItem(KEY_REMINDER_SETTINGS);
+    if (!raw) return null;
+    return JSON.parse(raw) as Partial<ReminderSettings>;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveReminderSettings(settings: ReminderSettings): Promise<void> {
+  try {
+    await LargeSecureStoreAdapter.setItem(KEY_REMINDER_SETTINGS, JSON.stringify(settings));
+  } catch {}
 }
