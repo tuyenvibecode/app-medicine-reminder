@@ -10,18 +10,16 @@ import {
   TextInput,
   Modal,
   Alert,
-  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Image } from 'expo-image';
 import {
   Pill,
   Search,
   Plus,
   AlertTriangle,
-  ChevronRight,
   ShoppingBag,
-  Check,
   X,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -29,69 +27,13 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { useAppStore } from '@/context/AppContext';
 import type { Medication } from '@/types';
-
-const INITIAL_MEDICATIONS: Medication[] = [
-  {
-    id: 'm-diabetes',
-    user_id: 'u1',
-    name: 'Glucophage XR 500mg (Tiểu đường)',
-    dosage: '1 viên / ngày - Sau bữa tối',
-    notes: 'Liệu trình điều trị 3 tháng liên tiếp',
-    treatment_type: 'course',
-    course_duration_months: 3,
-    total_course_stock: 90, // Cả đợt 3 tháng cần 90 viên
-    stock: 30, // Đợt 1 mua trước 1 tháng = 30 viên
-    low_stock_threshold: 5,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'm1',
-    user_id: 'u1',
-    name: 'Amlodipine 5mg (Huyết áp)',
-    dosage: '1 viên / ngày',
-    notes: 'Uống sau bữa ăn sáng',
-    treatment_type: 'ongoing',
-    stock: 24,
-    low_stock_threshold: 5,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'm2',
-    user_id: 'u1',
-    name: 'Omega 3 Dầu cá Nauy',
-    dosage: '1 viên nang mềm / ngày',
-    notes: 'Bảo quản nơi thoáng mát',
-    treatment_type: 'ongoing',
-    stock: 12,
-    low_stock_threshold: 7,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'm3',
-    user_id: 'u1',
-    name: 'Vitamin C 500mg',
-    dosage: '1 viên / ngày',
-    notes: 'Uống sau bữa trưa',
-    treatment_type: 'ongoing',
-    stock: 4, // Cảnh báo sắp hết
-    low_stock_threshold: 5,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
 
 export default function MedicationsScreen() {
   const router = useRouter();
+  const { medications, refillMedication } = useAppStore();
   const [search, setSearch] = useState('');
-  const [medications, setMedications] = useState<Medication[]>(INITIAL_MEDICATIONS);
 
   // Modal nạp thêm thuốc (khi mua thêm đợt mới)
   const [refillModalVisible, setRefillModalVisible] = useState(false);
@@ -129,15 +71,7 @@ export default function MedicationsScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
 
-    setMedications((prev) =>
-      prev.map((m) => {
-        if (m.id === refillMed.id) {
-          const newStock = (m.stock || 0) + addCount;
-          return { ...m, stock: newStock };
-        }
-        return m;
-      })
-    );
+    refillMedication(refillMed.id, addCount);
 
     setRefillModalVisible(false);
     Alert.alert(
@@ -212,10 +146,18 @@ export default function MedicationsScreen() {
                 <Card key={item.id} className="mb-3.5 p-4 border-border/70">
                   {/* Hàng trên: Ảnh, tên và badge */}
                   <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center flex-1">
-                      <View className="h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20">
-                        <Pill size={26} color="#0D9488" strokeWidth={1.8} />
-                      </View>
+                    <View className="flex-row items-center flex-1 mr-2">
+                      {item.image ? (
+                        <Image
+                          source={{ uri: item.image }}
+                          className="h-14 w-14 rounded-2xl bg-muted/20 border border-border"
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View className="h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20">
+                          <Pill size={26} color="#0D9488" strokeWidth={1.8} />
+                        </View>
+                      )}
 
                       <View className="flex-1 pl-3.5">
                         <Text
@@ -239,7 +181,7 @@ export default function MedicationsScreen() {
                             label={`${currentStock}/${totalCourse} viên`}
                           />
                           <Text className="text-[10px] text-muted-foreground mt-0.5">
-                            Liệu trình {item.course_duration_months || 3} tháng
+                            Liệu trình {item.course_duration_months || 1} tháng
                           </Text>
                         </View>
                       ) : (
@@ -284,7 +226,7 @@ export default function MedicationsScreen() {
 
                   {/* Nút hành động nhanh: Mua thêm thuốc đợt mới */}
                   <View className="flex-row items-center justify-between pt-3 mt-2.5 border-t border-border/40">
-                    <Text className="text-xs text-muted-foreground">
+                    <Text className="text-xs text-muted-foreground flex-1 mr-2" numberOfLines={1}>
                       {item.notes || 'Dùng đều đặn mỗi ngày'}
                     </Text>
 
@@ -354,7 +296,7 @@ export default function MedicationsScreen() {
               className="mb-4"
             />
 
-            <View className="flex-row space-x-2">
+            <View className="flex-row gap-2">
               <Button
                 variant="outline"
                 className="flex-1 h-11 rounded-xl"

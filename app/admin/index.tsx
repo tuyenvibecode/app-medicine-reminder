@@ -20,12 +20,9 @@ import {
   ShieldCheck,
   Key,
   Copy,
-  Trash2,
-  Lock,
   UserCheck,
   Stethoscope,
   X,
-  Check,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Card } from '@/components/ui/card';
@@ -149,8 +146,9 @@ export default function FamilyAdminScreen() {
           <TouchableOpacity
             onPress={() => router.back()}
             className="h-10 w-10 rounded-full bg-muted/60 items-center justify-center mr-3"
+            accessibilityLabel="Quay lại"
           >
-            <ArrowLeft size={20} color="#0F172A" />
+            <ArrowLeft size={20} color="#64748B" />
           </TouchableOpacity>
           <View>
             <Text className="text-xl font-bold text-foreground">
@@ -189,7 +187,7 @@ export default function FamilyAdminScreen() {
                 Gia đình Hạnh Phúc
               </Text>
               <Text className="text-xs text-muted-foreground mt-1">
-                {members.length} tài khoản thành viên đang hoạt động
+                {members.filter((m) => m.isActive).length}/{members.length} tài khoản đang hoạt động
               </Text>
             </View>
 
@@ -207,7 +205,6 @@ export default function FamilyAdminScreen() {
         {members.map((member) => {
           const isAdmin = member.role === 'admin';
           const isPharmacist = member.role === 'pharmacist';
-          const isPatient = member.role === 'patient';
 
           return (
             <Card key={member.id} className="mb-3.5 p-4 border-border/70">
@@ -233,10 +230,13 @@ export default function FamilyAdminScreen() {
                   </View>
 
                   <View className="ml-3.5 flex-1">
-                    <View className="flex-row items-center">
+                    <View className="flex-row items-center flex-wrap gap-1.5">
                       <Text className="text-base font-bold text-foreground" numberOfLines={1}>
                         {member.name}
                       </Text>
+                      {!member.isActive && (
+                        <Badge variant="destructive" label="Tạm khoá" />
+                      )}
                     </View>
                     <Text className="text-xs text-muted-foreground mt-0.5">
                       {member.relationship} • {member.email}
@@ -275,7 +275,7 @@ export default function FamilyAdminScreen() {
                 )}
 
                 {!isAdmin && (
-                  <View className="flex-row space-x-2">
+                  <View className="flex-row gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -347,7 +347,7 @@ export default function FamilyAdminScreen() {
             <Text className="text-xs font-semibold text-foreground mb-1.5">
               Vai trò trong ứng dụng
             </Text>
-            <View className="flex-row space-x-2 mb-5">
+            <View className="flex-row gap-2 mb-5">
               <TouchableOpacity
                 onPress={() => setNewRole('patient')}
                 className={`flex-1 p-2.5 rounded-xl border items-center ${
@@ -389,7 +389,7 @@ export default function FamilyAdminScreen() {
               </TouchableOpacity>
             </View>
 
-            <View className="flex-row space-x-2">
+            <View className="flex-row gap-2">
               <Button
                 variant="outline"
                 className="flex-1 h-11 rounded-xl"

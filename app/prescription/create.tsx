@@ -16,7 +16,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import {
-  ArrowLeft,
   Search,
   Plus,
   Trash2,
@@ -24,15 +23,11 @@ import {
   CheckCircle,
   Stethoscope,
   Pill,
-  Clock,
-  Share2,
   CalendarCheck,
   AlertCircle,
   X,
-  ChevronDown,
   ChevronRight,
   ArrowRight,
-  Sparkles,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Card } from '@/components/ui/card';
@@ -40,6 +35,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { searchMedicines } from '@/services/medicineService';
+import { useAppStore } from '@/context/AppContext';
 import type { CatalogMedicine, PrescriptionMedicineItem } from '@/types';
 
 // Tuỳ chọn hướng dẫn nhanh khi chọn liều thuốc
@@ -53,19 +49,27 @@ const QUICK_DOSAGE_OPTIONS = [
 
 export default function CreatePrescriptionScreen() {
   const router = useRouter();
+  const { syncPrescriptionToReminders } = useAppStore();
 
   // Tab giao diện: 'builder' (Chọn thuốc) hoặc 'note' (Xem phiếu đơn thuốc hoàn chỉnh)
   const [activeTab, setActiveTab] = useState<'builder' | 'note'>('builder');
 
   // Thông tin đơn thuốc & dặn dò
-  const [generalInstructions, setGeneralInstructions] = useState('Uống nhiều nước ấm, nghỉ ngơi điều độ. Kiêng nước đá và đồ cay nóng.');
+  const [generalInstructions, setGeneralInstructions] = useState(
+    'Uống nhiều nước ấm, nghỉ ngơi điều độ. Kiêng nước đá và đồ cay nóng.'
+  );
   const [prescriptionItems, setPrescriptionItems] = useState<PrescriptionMedicineItem[]>([]);
 
-  // Tìm kiếm thuốc
+  // Tìm kiếm thuốc & bộ lọc thuốc không kê đơn (an toàn y tế rule 04)
   const [searchQuery, setSearchQuery] = useState('');
+  const [classificationFilter, setClassificationFilter] = useState<'all' | 'Thuốc không kê đơn'>('all');
+
   const searchResults = useMemo(() => {
-    return searchMedicines(searchQuery, { limit: 25 });
-  }, [searchQuery]);
+    return searchMedicines(searchQuery, {
+      limit: 25,
+      classification: classificationFilter,
+    });
+  }, [searchQuery, classificationFilter]);
 
   // Modal tùy chỉnh liều & số lượng khi thêm thuốc
   const [modalVisible, setModalVisible] = useState(false);
@@ -148,6 +152,26 @@ export default function CreatePrescriptionScreen() {
     setPrescriptionItems((prev) => prev.filter((item) => item.id !== id));
   };
 
+  // Thêm toàn bộ thuốc trong đơn vào lịch nhắc 1-chạm
+  const handleSyncToReminders = () => {
+    if (prescriptionItems.length === 0) {
+      Alert.alert('Chưa có thuốc', 'Vui lòng thêm ít nhất một loại thuốc vào đơn.');
+      return;
+    }
+
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+
+    syncPrescriptionToReminders(prescriptionItems);
+
+    Alert.alert(
+      'Đã lên lịch nhắc thuốc!',
+      `Toàn bộ ${prescriptionItems.length} loại thuốc trong đơn đã được tự động thêm vào Tủ thuốc và Lịch nhắc uống thuốc hàng ngày của gia đình.`,
+      [{ text: 'Xem Lịch nhắc', onPress: () => router.replace('/(tabs)' as any) }]
+    );
+  };
+
   // Lưu đơn thuốc
   const handleSavePrescription = () => {
     if (prescriptionItems.length === 0) {
@@ -169,24 +193,11 @@ export default function CreatePrescriptionScreen() {
     );
   };
 
-  // Thêm toàn bộ thuốc trong đơn vào lịch nhắc 1-chạm
-  const handleSyncToReminders = () => {
-    try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
-
-    Alert.alert(
-      'Đã lên lịch nhắc thuốc!',
-      `Toàn bộ ${prescriptionItems.length} loại thuốc trong đơn đã được tự động thêm vào lịch nhắc uống thuốc hàng ngày của gia đình.`,
-      [{ text: 'Xem Lịch nhắc', onPress: () => router.replace('/(tabs)' as any) }]
-    );
-  };
-
   return (
     <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-background">
-      {/* Header chuẩn: Không bị chèn ép chữ (Fix Ô vuông đỏ 1) */}
+      {/* Header chuẩn: Không bị chèn ép chữ */}
       <View className="px-4 pt-3 pb-3 bg-card border-b border-border/60">
-        {/* Hàng 1: Tiêu đề thoáng đãng và nút quay lại */}
+        {/* Hàng 1: Tiêu đề thoáng đãng */}
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center flex-1 mr-2">
             <View className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center mr-2.5">
@@ -271,158 +282,198 @@ export default function CreatePrescriptionScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-          {/* 1. Danh sách thuốc ĐÃ CHỌN trong đơn này - Thiết kế tinh tế, không thô (Fix Ô vuông đỏ 2) */}
-          {prescriptionItems.length > 0 && (
-            <Card key="selected-items-card" className="mb-4 p-4 border border-border/80 bg-card rounded-3xl shadow-sm">
-              <View className="flex-row items-center justify-between pb-2.5 mb-1 border-b border-border/40">
-                <View className="flex-row items-center">
-                  <View className="h-7 w-7 rounded-xl bg-primary/10 items-center justify-center mr-2">
-                    <Pill size={15} color="#0D9488" strokeWidth={2.2} />
-                  </View>
-                  <Text className="text-sm font-bold text-foreground">
-                    Thuốc đã chọn vào đơn ({prescriptionItems.length})
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setActiveTab('note')}
-                  className="flex-row items-center bg-primary/10 px-2.5 py-1 rounded-full"
-                >
-                  <Text className="text-xs font-bold text-primary">Xem phiếu note</Text>
-                  <ChevronRight size={13} color="#0D9488" />
-                </TouchableOpacity>
-              </View>
-
-              {prescriptionItems.map((item, index) => (
-                <View
-                  key={item.id}
-                  className="flex-row items-center justify-between py-2.5 border-b border-border/30 last:border-b-0"
-                >
-                  <View className="flex-row items-center flex-1 mr-2">
-                    <Text className="text-xs font-bold text-primary mr-2">{index + 1}.</Text>
-                    {item.image ? (
-                      <Image
-                        source={{ uri: item.image }}
-                        className="h-11 w-11 rounded-xl bg-muted/20 border border-border/50"
-                        contentFit="contain"
-                      />
-                    ) : (
-                      <View className="h-11 w-11 rounded-xl bg-primary/10 items-center justify-center">
-                        <Pill size={20} color="#0D9488" />
-                      </View>
-                    )}
-                    <View className="ml-2.5 flex-1">
-                      <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
-                        {item.name}
-                      </Text>
-                      <Text className="text-xs text-muted-foreground mt-0.5" numberOfLines={1}>
-                        {item.dosageInstruction}
-                      </Text>
-                    </View>
-                  </View>
-
+            {/* 1. Danh sách thuốc ĐÃ CHỌN trong đơn này */}
+            {prescriptionItems.length > 0 && (
+              <Card key="selected-items-card" className="mb-4 p-4 border border-border/80 bg-card rounded-3xl shadow-sm">
+                <View className="flex-row items-center justify-between pb-2.5 mb-1 border-b border-border/40">
                   <View className="flex-row items-center">
-                    <View className="bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
-                      <Text className="text-xs font-bold text-primary">
-                        {item.quantity} {item.unit}
-                      </Text>
+                    <View className="h-7 w-7 rounded-xl bg-primary/10 items-center justify-center mr-2">
+                      <Pill size={15} color="#0D9488" strokeWidth={2.2} />
                     </View>
-                    <TouchableOpacity
-                      onPress={() => handleRemoveItem(item.id)}
-                      className="ml-2.5 h-8 w-8 rounded-full bg-destructive/10 items-center justify-center"
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Trash2 size={15} color="#EF4444" strokeWidth={2} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </Card>
-          )}
-
-          {/* 3. Kho tra cứu thuốc từ chi_thuoc.json (Tra cứu Offline siêu tốc) */}
-          <View key="catalog-header" className="flex-row items-center justify-between mb-2 ml-1">
-            <Text className="text-sm font-bold text-foreground">
-              Tra cứu thuốc từ kho dữ liệu (An Khang)
-            </Text>
-            <Badge variant="outline" label="Offline sẵn sàng" />
-          </View>
-
-          {/* Ô tìm kiếm */}
-          <View key="catalog-search-bar" className="flex-row items-center bg-card border border-border/80 rounded-2xl px-3.5 h-12 mb-3">
-            <Search size={18} color="#94A3B8" />
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Gõ tên thuốc, công dụng (ví dụ: Difflam, Kháng viêm...)"
-              placeholderTextColor="#94A3B8"
-              className="flex-1 ml-2.5 text-sm text-foreground"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X size={16} color="#94A3B8" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Danh sách kết quả tìm kiếm */}
-          {searchResults.map((med, index) => {
-            const isPrescription = med.classification === 'Thuốc kê đơn';
-            return (
-              <Card key={`${med.name}-${index}`} className="mb-2.5 p-3.5 border-border/70">
-                <View className="flex-row items-center justify-between">
-                  {/* Ảnh thuốc */}
-                  <View className="flex-row items-center flex-1 mr-2">
-                    {med.image ? (
-                      <Image
-                        source={{ uri: med.image }}
-                        className="h-14 w-14 rounded-2xl bg-muted/20 border border-border"
-                        contentFit="contain"
-                      />
-                    ) : (
-                      <View className="h-14 w-14 rounded-2xl bg-primary/10 items-center justify-center">
-                        <Pill size={24} color="#0D9488" />
-                      </View>
-                    )}
-
-                    {/* Tên & thông tin */}
-                    <View className="ml-3 flex-1">
-                      <Text className="text-sm font-bold text-foreground" numberOfLines={2}>
-                        {med.name}
-                      </Text>
-                      <Text className="text-xs text-muted-foreground mt-0.5" numberOfLines={1}>
-                        {med.dosage_form || 'Dạng thuốc'} {med.brand ? `• ${med.brand}` : ''}
-                      </Text>
-                      {med.short_usage && (
-                        <Text className="text-[11px] text-muted-foreground/80 mt-0.5" numberOfLines={1}>
-                          {med.short_usage}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Nút Chọn */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 px-3 rounded-xl border-primary/40 bg-primary/5"
-                    onPress={() => handleSelectMedicine(med)}
-                  >
-                    <Plus size={14} color="#0D9488" strokeWidth={2.5} />
-                    <Text className="text-xs font-bold text-primary ml-1">Chọn</Text>
-                  </Button>
-                </View>
-
-                {isPrescription && (
-                  <View className="flex-row items-center mt-1.5 pt-1.5 border-t border-border/30">
-                    <AlertCircle size={11} color="#F59E0B" />
-                    <Text className="text-[10px] text-amber-600 font-medium ml-1">
-                      Thuốc kê đơn - Cần hướng dẫn kỹ của dược sĩ/bác sĩ
+                    <Text className="text-sm font-bold text-foreground">
+                      Thuốc đã chọn vào đơn ({prescriptionItems.length})
                     </Text>
                   </View>
-                )}
+                  <TouchableOpacity
+                    onPress={() => setActiveTab('note')}
+                    className="flex-row items-center bg-primary/10 px-2.5 py-1 rounded-full"
+                  >
+                    <Text className="text-xs font-bold text-primary">Xem phiếu note</Text>
+                    <ChevronRight size={13} color="#0D9488" />
+                  </TouchableOpacity>
+                </View>
+
+                {prescriptionItems.map((item, index) => (
+                  <View
+                    key={item.id}
+                    className="flex-row items-center justify-between py-2.5 border-b border-border/30 last:border-b-0"
+                  >
+                    <View className="flex-row items-center flex-1 mr-2">
+                      <Text className="text-xs font-bold text-primary mr-2">{index + 1}.</Text>
+                      {item.image ? (
+                        <Image
+                          source={{ uri: item.image }}
+                          className="h-11 w-11 rounded-xl bg-muted/20 border border-border/50"
+                          contentFit="contain"
+                        />
+                      ) : (
+                        <View className="h-11 w-11 rounded-xl bg-primary/10 items-center justify-center">
+                          <Pill size={20} color="#0D9488" />
+                        </View>
+                      )}
+                      <View className="ml-2.5 flex-1">
+                        <Text className="text-sm font-bold text-foreground" numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text className="text-xs text-muted-foreground mt-0.5" numberOfLines={1}>
+                          {item.dosageInstruction}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View className="flex-row items-center">
+                      <View className="bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
+                        <Text className="text-xs font-bold text-primary">
+                          {item.quantity} {item.unit}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleRemoveItem(item.id)}
+                        className="ml-2.5 h-8 w-8 rounded-full bg-destructive/10 items-center justify-center"
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel={`Xoá ${item.name} khỏi đơn`}
+                      >
+                        <Trash2 size={15} color="#EF4444" strokeWidth={2} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
               </Card>
-            );
-          })}
+            )}
+
+            {/* 2. Kho tra cứu thuốc từ chi_thuoc.json */}
+            <View key="catalog-header" className="flex-row items-center justify-between mb-2 ml-1">
+              <Text className="text-sm font-bold text-foreground">
+                Tra cứu thuốc từ kho dữ liệu (An Khang)
+              </Text>
+              <Badge variant="outline" label="Offline sẵn sàng" />
+            </View>
+
+            {/* Ô tìm kiếm */}
+            <View key="catalog-search-bar" className="flex-row items-center bg-card border border-border/80 rounded-2xl px-3.5 h-12 mb-2.5">
+              <Search size={18} color="#94A3B8" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Gõ tên thuốc, công dụng (ví dụ: Difflam, Kháng viêm...)"
+                placeholderTextColor="#94A3B8"
+                className="flex-1 ml-2.5 text-sm text-foreground"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <X size={16} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Bộ lọc thuốc không kê đơn (Rule 04-medical-safety) */}
+            <View className="flex-row gap-2 mb-3">
+              <TouchableOpacity
+                onPress={() => setClassificationFilter('all')}
+                className={`px-3 py-1.5 rounded-full border ${
+                  classificationFilter === 'all'
+                    ? 'bg-primary/10 border-primary'
+                    : 'bg-card border-border/80'
+                }`}
+              >
+                <Text
+                  className={`text-xs font-semibold ${
+                    classificationFilter === 'all' ? 'text-primary' : 'text-muted-foreground'
+                  }`}
+                >
+                  Tất cả danh mục
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setClassificationFilter('Thuốc không kê đơn')}
+                className={`px-3 py-1.5 rounded-full border ${
+                  classificationFilter === 'Thuốc không kê đơn'
+                    ? 'bg-primary/10 border-primary'
+                    : 'bg-card border-border/80'
+                }`}
+              >
+                <Text
+                  className={`text-xs font-semibold ${
+                    classificationFilter === 'Thuốc không kê đơn'
+                      ? 'text-primary'
+                      : 'text-muted-foreground'
+                  }`}
+                >
+                  Chỉ thuốc không kê đơn (OTC)
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Danh sách kết quả tìm kiếm */}
+            {searchResults.map((med, index) => {
+              const isPrescription = med.classification === 'Thuốc kê đơn';
+              return (
+                <Card key={`${med.name}-${index}`} className="mb-2.5 p-3.5 border-border/70">
+                  <View className="flex-row items-center justify-between">
+                    {/* Ảnh thuốc */}
+                    <View className="flex-row items-center flex-1 mr-2">
+                      {med.image ? (
+                        <Image
+                          source={{ uri: med.image }}
+                          className="h-14 w-14 rounded-2xl bg-muted/20 border border-border"
+                          contentFit="contain"
+                        />
+                      ) : (
+                        <View className="h-14 w-14 rounded-2xl bg-primary/10 items-center justify-center">
+                          <Pill size={24} color="#0D9488" />
+                        </View>
+                      )}
+
+                      {/* Tên & thông tin */}
+                      <View className="ml-3 flex-1">
+                        <Text className="text-sm font-bold text-foreground" numberOfLines={2}>
+                          {med.name}
+                        </Text>
+                        <Text className="text-xs text-muted-foreground mt-0.5" numberOfLines={1}>
+                          {med.dosage_form || 'Dạng thuốc'} {med.brand ? `• ${med.brand}` : ''}
+                        </Text>
+                        {med.short_usage && (
+                          <Text className="text-[11px] text-muted-foreground/80 mt-0.5" numberOfLines={1}>
+                            {med.short_usage}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Nút Chọn */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3 rounded-xl border-primary/40 bg-primary/5"
+                      onPress={() => handleSelectMedicine(med)}
+                    >
+                      <Plus size={14} color="#0D9488" strokeWidth={2.5} />
+                      <Text className="text-xs font-bold text-primary ml-1">Chọn</Text>
+                    </Button>
+                  </View>
+
+                  {isPrescription && (
+                    <View className="flex-row items-center mt-1.5 pt-1.5 border-t border-border/30">
+                      <AlertCircle size={11} color="#F59E0B" />
+                      <Text className="text-[10px] text-amber-600 font-medium ml-1">
+                        Thuốc kê đơn - Chỉ dùng khi đã có chỉ định của bác sĩ
+                      </Text>
+                    </View>
+                  )}
+                </Card>
+              );
+            })}
           </ScrollView>
 
           {/* Floating Dock Bar khi có thuốc trong đơn */}
@@ -486,7 +537,12 @@ export default function CreatePrescriptionScreen() {
               <View className="mt-3 bg-muted/40 px-3.5 py-2 rounded-xl flex-row items-center justify-between">
                 <Text className="text-xs text-muted-foreground">Thời gian tạo:</Text>
                 <Text className="text-xs font-semibold text-foreground">
-                  {new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  {new Date().toLocaleDateString('vi-VN', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
                 </Text>
               </View>
             </View>
@@ -546,26 +602,31 @@ export default function CreatePrescriptionScreen() {
               </View>
             ))}
 
-            {/* Lời dặn dò chung */}
+            {/* Lời dặn dò chung (Cho phép dược sĩ chỉnh sửa trực tiếp) */}
             <View className="mt-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
-              <Text className="text-xs font-bold text-amber-800 dark:text-amber-300 mb-1">
-                💬 Lời dặn của dược sĩ:
+              <Text className="text-xs font-bold text-amber-800 dark:text-amber-300 mb-1.5">
+                💬 Lời dặn của dược sĩ (chạm để sửa):
               </Text>
-              <Text className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-                {generalInstructions}
-              </Text>
+              <TextInput
+                value={generalInstructions}
+                onChangeText={setGeneralInstructions}
+                multiline
+                placeholder="Nhập lời dặn dò cho người nhà..."
+                placeholderTextColor="#94A3B8"
+                className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed p-0"
+              />
             </View>
 
             {/* Cam kết an toàn y tế (Bắt buộc theo rule 04) */}
             <View className="mt-4 pt-3 border-t border-border/40">
               <Text className="text-[11px] text-muted-foreground text-center italic leading-relaxed">
-                * Phiếu chỉ mang tính hỗ trợ dặn dò trong gia đình. Nếu triệu chứng không thuyên giảm hoặc nặng hơn, hãy đi khám tại cơ sở y tế.
+                * Chỉ mang tính hỗ trợ trong gia đình. Nếu triệu chứng nặng hoặc kéo dài, hãy đi khám.
               </Text>
             </View>
           </Card>
 
           {/* Các nút hành động chính */}
-          <View className="space-y-3 mb-6">
+          <View className="gap-3 mb-6">
             {/* Nút 1: Thêm ngay vào Lịch nhắc thuốc */}
             <Button
               variant="default"
@@ -580,7 +641,7 @@ export default function CreatePrescriptionScreen() {
             </Button>
 
             {/* Nút 2: Lưu đơn thuốc */}
-            <View className="flex-row space-x-2.5">
+            <View className="flex-row gap-2.5">
               <Button
                 variant="outline"
                 size="default"
@@ -632,7 +693,7 @@ export default function CreatePrescriptionScreen() {
 
             <ScrollView className="py-3" showsVerticalScrollIndicator={false}>
               {/* Thông tin thuốc đã chọn */}
-              <View className="flex-row items-center mb-4 p-3 bg-muted/30 rounded-2xl border border-border/50">
+              <View className="flex-row items-center mb-3 p-3 bg-muted/30 rounded-2xl border border-border/50">
                 {selectedMedicine?.image ? (
                   <Image
                     source={{ uri: selectedMedicine.image }}
@@ -649,16 +710,26 @@ export default function CreatePrescriptionScreen() {
                     {selectedMedicine?.name}
                   </Text>
                   <Text className="text-xs text-muted-foreground mt-0.5">
-                    {selectedMedicine?.dosage_form || 'Dạng thuốc'} {selectedMedicine?.strength ? `• ${selectedMedicine.strength}` : ''}
+                    {selectedMedicine?.dosage_form || 'Dạng thuốc'}{' '}
+                    {selectedMedicine?.strength ? `• ${selectedMedicine.strength}` : ''}
                   </Text>
                 </View>
               </View>
+
+              {selectedMedicine?.classification === 'Thuốc kê đơn' && (
+                <View className="flex-row items-center mb-4 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25">
+                  <AlertCircle size={15} color="#F59E0B" />
+                  <Text className="text-xs text-amber-700 dark:text-amber-300 font-medium ml-2 flex-1">
+                    Lưu ý an toàn: Đây là thuốc kê đơn. Chỉ lưu lịch nhắc khi người bệnh đã có toa chỉ định của bác sĩ.
+                  </Text>
+                </View>
+              )}
 
               {/* Ô nhập số lượng viên/gói */}
               <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
                 Số lượng cần kê ({unit}):
               </Text>
-              <View className="flex-row items-center space-x-2 mb-4">
+              <View className="flex-row items-center gap-2 mb-4">
                 <TouchableOpacity
                   onPress={() => {
                     const current = parseInt(quantity, 10) || 1;
@@ -689,7 +760,7 @@ export default function CreatePrescriptionScreen() {
               </View>
 
               {/* Các nút chọn nhanh số lượng */}
-              <View className="flex-row space-x-2 mb-4">
+              <View className="flex-row gap-2 mb-4">
                 {['5', '10', '15', '20', '30'].map((num) => (
                   <TouchableOpacity
                     key={num}

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Shield, X, KeyRound, Mail, Sparkles } from 'lucide-react-native';
+import { Shield, X, Mail, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -90,6 +90,7 @@ export default function LoginScreen() {
             size="icon"
             className="h-10 w-10 rounded-full bg-muted/60"
             onPress={() => router.back()}
+            accessibilityLabel="Đóng màn hình đăng nhập"
           >
             <X size={20} color="#64748B" />
           </Button>

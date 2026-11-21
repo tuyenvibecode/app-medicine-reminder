@@ -18,7 +18,6 @@ import {
   KeyRound,
   LogOut,
   ChevronRight,
-  Sparkles,
   QrCode,
   Lock,
   Settings,
@@ -239,7 +238,7 @@ export default function AccountScreen() {
               <Text className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">
                 Cách 1: Nhập mã gia đình (1-chạm)
               </Text>
-              <View className="flex-row space-x-2 mb-4">
+              <View className="flex-row gap-2 mb-4">
                 <Input
                   value={inviteCodeInput}
                   onChangeText={setInviteCodeInput}

@@ -9,10 +9,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Image } from 'expo-image';
 import {
   Camera,
   Image as ImageIcon,
@@ -25,11 +25,13 @@ import {
   ShoppingBag,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as Haptics from 'expo-haptics';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useAppStore } from '@/context/AppContext';
 import type { TreatmentType } from '@/types';
 
 const QUICK_TIMES = ['07:30 (Sáng)', '12:00 (Trưa)', '18:30 (Chiều)', '21:00 (Tối)'];
@@ -40,8 +42,26 @@ const COURSE_DURATIONS = [
   { label: '6 tháng', months: 6, days: 180 },
 ];
 
+/**
+ * Nén ảnh và loại bỏ siêu dữ liệu EXIF GPS trước khi lưu/hiển thị (Tuân thủ rule 01-security.md)
+ */
+async function sanitizeAndCompressImage(uri: string): Promise<string> {
+  try {
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 800 } }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    return result.uri;
+  } catch {
+    return uri;
+  }
+}
+
 export default function AddMedicationScreen() {
   const router = useRouter();
+  const { addMedication } = useAppStore();
+
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
@@ -49,10 +69,10 @@ export default function AddMedicationScreen() {
 
   // Quản lý liệu trình điều trị
   const [treatmentType, setTreatmentType] = useState<TreatmentType>('course');
-  const [selectedMonths, setSelectedMonths] = useState<number>(3); // Mặc định ví dụ 3 tháng
-  const [totalCourseStock, setTotalCourseStock] = useState<string>('90'); // 3 tháng x 30 viên = 90 viên
-  const [purchasedStock, setPurchasedStock] = useState<string>('30'); // Mua trước 1 tháng = 30 viên
-  const [lowStockThreshold, setLowStockThreshold] = useState<string>('5'); // Báo khi còn 5 viên
+  const [selectedMonths, setSelectedMonths] = useState<number>(3);
+  const [totalCourseStock, setTotalCourseStock] = useState<string>('90');
+  const [purchasedStock, setPurchasedStock] = useState<string>('30');
+  const [lowStockThreshold, setLowStockThreshold] = useState<string>('5');
 
   const [selectedTimes, setSelectedTimes] = useState<string[]>(['07:30 (Sáng)']);
 
@@ -67,7 +87,8 @@ export default function AddMedicationScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setPhotoUri(result.assets[0].uri);
+        const cleanUri = await sanitizeAndCompressImage(result.assets[0].uri);
+        setPhotoUri(cleanUri);
       }
     } catch {
       Alert.alert('Thông báo', 'Không thể mở thư viện ảnh.');
@@ -90,7 +111,8 @@ export default function AddMedicationScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setPhotoUri(result.assets[0].uri);
+        const cleanUri = await sanitizeAndCompressImage(result.assets[0].uri);
+        setPhotoUri(cleanUri);
       }
     } catch {
       Alert.alert('Thông báo', 'Không thể mở máy ảnh.');
@@ -114,12 +136,12 @@ export default function AddMedicationScreen() {
       Haptics.selectionAsync();
     } catch {}
     setSelectedMonths(months);
-    // Tự động tính số viên (ước tính 1 viên/ngày)
     setTotalCourseStock(days.toString());
   };
 
   const totalNum = parseInt(totalCourseStock, 10) || 0;
   const currentNum = parseInt(purchasedStock, 10) || 0;
+  const thresholdNum = parseInt(lowStockThreshold, 10) || 5;
   const remainingNeeded = Math.max(0, totalNum - currentNum);
   const progressPercent = totalNum > 0 ? Math.min(100, Math.round((currentNum / totalNum) * 100)) : 0;
 
@@ -129,13 +151,31 @@ export default function AddMedicationScreen() {
       return;
     }
 
+    if (selectedTimes.length === 0) {
+      Alert.alert('Chưa chọn giờ uống', 'Vui lòng chọn ít nhất một khung giờ uống thuốc trong ngày.');
+      return;
+    }
+
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
 
+    addMedication({
+      name: name.trim(),
+      dosage: dosage.trim() || '1 viên - Sau ăn',
+      notes: notes.trim(),
+      image: photoUri,
+      treatmentType,
+      courseDurationMonths: selectedMonths,
+      totalCourseStock: totalNum,
+      stock: currentNum,
+      lowStockThreshold: thresholdNum,
+      selectedTimes,
+    });
+
     Alert.alert(
       'Thành công',
-      `Đã thêm "${name}" vào tủ thuốc.\nHiện có: ${currentNum} viên ${
+      `Đã thêm "${name.trim()}" vào tủ thuốc và đặt lịch nhắc.\nHiện có: ${currentNum} viên ${
         treatmentType === 'course' ? `(Cả liệu trình: ${totalNum} viên)` : ''
       }.`,
       [{ text: 'Xong', onPress: () => router.back() }]
@@ -152,6 +192,7 @@ export default function AddMedicationScreen() {
           size="icon"
           className="h-10 w-10 rounded-full bg-muted/60"
           onPress={() => router.back()}
+          accessibilityLabel="Đóng màn hình thêm thuốc"
         >
           <X size={20} color="#64748B" />
         </Button>
@@ -169,8 +210,9 @@ export default function AddMedicationScreen() {
               <Image
                 source={{ uri: photoUri }}
                 className="h-32 w-32 rounded-3xl mb-3 border border-border"
+                contentFit="cover"
               />
-              <View className="flex-row space-x-2">
+              <View className="flex-row gap-2">
                 <Button variant="outline" size="sm" onPress={handlePickImage}>
                   <Text className="text-xs text-foreground">Đổi ảnh</Text>
                 </Button>
@@ -191,7 +233,7 @@ export default function AddMedicationScreen() {
                 Chụp ảnh rõ viên thuốc để nhận diện dễ dàng lúc chuông reo
               </Text>
 
-              <View className="flex-row space-x-3 mt-4">
+              <View className="flex-row gap-3 mt-4">
                 <Button
                   variant="outline"
                   size="sm"
@@ -395,14 +437,14 @@ export default function AddMedicationScreen() {
               {remainingNeeded > 0 ? (
                 <View className="flex-row items-center mt-2.5">
                   <AlertCircle size={14} color="#F59E0B" />
-                  <Text className="text-xs text-amber-700 dark:text-amber-400 font-medium ml-1.5">
+                  <Text className="text-xs text-amber-700 dark:text-amber-400 font-medium ml-1.5 flex-1">
                     Đợt này mua {currentNum} viên. Còn thiếu {remainingNeeded} viên để hoàn tất {selectedMonths} tháng điều trị.
                   </Text>
                 </View>
               ) : (
                 <View className="flex-row items-center mt-2.5">
                   <Check size={14} color="#10B981" />
-                  <Text className="text-xs text-emerald-600 dark:text-emerald-400 font-medium ml-1.5">
+                  <Text className="text-xs text-emerald-600 dark:text-emerald-400 font-medium ml-1.5 flex-1">
                     Đã chuẩn bị đủ toàn bộ thuốc cho liệu trình!
                   </Text>
                 </View>

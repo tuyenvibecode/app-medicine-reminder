@@ -12,6 +12,7 @@ export interface Medication {
   dosage?: string | null;
   notes?: string | null;
   color?: string | null;
+  image?: string | null; // Ảnh viên thuốc hoặc hộp thuốc
   treatment_type?: TreatmentType | null; // Dài hạn hoặc Theo đợt
   course_duration_months?: number | null; // Liệu trình kéo dài bao nhiêu tháng (ví dụ 3 tháng)
   total_course_stock?: number | null; // Tổng số viên cần cho cả liệu trình (ví dụ 90 viên)
@@ -58,6 +59,7 @@ export interface DoseTimelineItem {
   timeGroup: TimeOfDayGroup;
   status: DoseStatus;
   color?: string;
+  image?: string | null;
   doseLogId?: string;
   stock?: number;
   totalCourseStock?: number;
@@ -65,6 +67,16 @@ export interface DoseTimelineItem {
   courseDurationMonths?: number;
   lowStockThreshold?: number;
   notes?: string;
+}
+
+export interface HistoryLogItem {
+  id: string;
+  doseId?: string;
+  medicationName: string;
+  dosage: string;
+  takenTime: string;
+  dateStr: string;
+  status: 'taken' | 'skipped' | 'missed';
 }
 
 export interface FamilyMember {

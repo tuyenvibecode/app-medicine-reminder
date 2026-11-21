@@ -9,21 +9,20 @@ import {
   ScrollView,
   Switch,
   Alert,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
+  ArrowLeft,
   ShieldCheck,
   Bell,
   Fingerprint,
   EyeOff,
   Users,
-  Info,
-  LogOut,
 } from 'lucide-react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -66,14 +65,23 @@ export default function SettingsScreen() {
         contentContainerStyle={{ paddingBottom: 90 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View className="pb-3">
-          <Text className="text-xs font-semibold text-primary uppercase tracking-wider">
-            Tuỳ chỉnh
-          </Text>
-          <Text className="text-2xl font-bold text-foreground tracking-tight">
-            Cài đặt
-          </Text>
+        {/* Header có nút Quay lại */}
+        <View className="flex-row items-center pb-4">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="h-10 w-10 rounded-full bg-muted/60 items-center justify-center mr-3"
+            accessibilityLabel="Quay lại"
+          >
+            <ArrowLeft size={20} color="#64748B" />
+          </TouchableOpacity>
+          <View>
+            <Text className="text-xs font-semibold text-primary uppercase tracking-wider">
+              Tuỳ chỉnh
+            </Text>
+            <Text className="text-2xl font-bold text-foreground tracking-tight">
+              Cài đặt
+            </Text>
+          </View>
         </View>
 
         {/* 1. Phần Thông báo & Nhắc nhở */}
@@ -108,7 +116,7 @@ export default function SettingsScreen() {
                   Ẩn tên thuốc ở màn hình khoá
                 </Text>
                 <Text className="text-xs text-muted-foreground mt-0.5">
-                  Chỉ hiện "Đến giờ uống thuốc" để tăng tính riêng tư
+                  Chỉ hiện &ldquo;Đến giờ uống thuốc&rdquo; để tăng tính riêng tư
                 </Text>
               </View>
             </View>

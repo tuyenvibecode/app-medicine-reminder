@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { CalendarCheck, Pill, History, User, Settings, FileText } from 'lucide-react-native';
+import { CalendarCheck, Pill, History, User, FileText } from 'lucide-react-native';
 import { useColorScheme } from 'react-native';
 import { COLORS } from '@/theme';
 

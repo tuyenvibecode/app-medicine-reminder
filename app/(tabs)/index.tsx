@@ -2,7 +2,7 @@
 // Màn hình chính "Hôm nay"
 // Theo sát UI-PROMPT.md: Lời chào, thanh tiến độ liều trong ngày, nhóm liều Sáng/Trưa/Chiều/Tối
 
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,93 +11,32 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Sun, Sunset, Moon, Plus, Sparkles, CheckCircle2 } from 'lucide-react-native';
+import { Sun, Sunset, CloudSun, Moon, Plus, CheckCircle2, CalendarCheck } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { DoseCard } from '@/components/DoseCard';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useAppStore } from '@/context/AppContext';
 import type { DoseTimelineItem } from '@/types';
-
-// Dữ liệu mẫu khởi đầu (để UI hoạt động mượt mà ngay cả khi chưa nối Supabase)
-const INITIAL_DOSES: DoseTimelineItem[] = [
-  {
-    id: '1',
-    scheduleId: 's1',
-    medicationId: 'm1',
-    medicationName: 'Amlodipine (Huyết áp)',
-    dosage: '1 viên (5mg) - Sau ăn',
-    scheduledTime: '07:30',
-    timeGroup: 'morning',
-    status: 'taken',
-    stock: 24,
-    lowStockThreshold: 5,
-  },
-  {
-    id: '2',
-    scheduleId: 's2',
-    medicationId: 'm2',
-    medicationName: 'Omega 3 Dầu cá',
-    dosage: '1 viên nang mềm - Sau ăn',
-    scheduledTime: '08:00',
-    timeGroup: 'morning',
-    status: 'upcoming',
-    stock: 12,
-    lowStockThreshold: 7,
-  },
-  {
-    id: '3',
-    scheduleId: 's3',
-    medicationId: 'm3',
-    medicationName: 'Vitamin C 500mg',
-    dosage: '1 viên - Sau bữa trưa',
-    scheduledTime: '12:30',
-    timeGroup: 'noon',
-    status: 'upcoming',
-    stock: 4,
-    lowStockThreshold: 5, // Cảnh báo sắp hết
-  },
-  {
-    id: '4',
-    scheduleId: 's4',
-    medicationId: 'm4',
-    medicationName: 'Magnesium B6',
-    dosage: '1 viên - Trước khi ngủ 30 phút',
-    scheduledTime: '21:00',
-    timeGroup: 'evening',
-    status: 'upcoming',
-    stock: 30,
-    lowStockThreshold: 6,
-  },
-  {
-    id: '5',
-    scheduleId: 's5',
-    medicationId: 'm-diabetes',
-    medicationName: 'Glucophage XR 500mg (Tiểu đường)',
-    dosage: '1 viên - Sau bữa tối',
-    scheduledTime: '19:30',
-    timeGroup: 'evening',
-    status: 'upcoming',
-    stock: 30,
-    totalCourseStock: 90,
-    courseDurationMonths: 3,
-    treatmentType: 'course',
-    lowStockThreshold: 5,
-  },
-];
 
 export default function TodayScreen() {
   const router = useRouter();
-  const [doses, setDoses] = useState<DoseTimelineItem[]>(INITIAL_DOSES);
+  const { doses, takeDose, undoTakeDose, snoozeDose } = useAppStore();
 
   // Xử lý bấm "Đã uống" 1-chạm
   const handleTakeDose = (item: DoseTimelineItem) => {
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
+    takeDose(item);
+  };
 
-    setDoses((prev) =>
-      prev.map((d) => (d.id === item.id ? { ...d, status: 'taken' } : d))
-    );
+  // Xử lý hoàn tác trạng thái "Đã uống"
+  const handleUndoTakeDose = (item: DoseTimelineItem) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    undoTakeDose(item);
   };
 
   // Xử lý hoãn nhắc sau 15 phút
@@ -106,19 +45,26 @@ export default function TodayScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch {}
 
+    snoozeDose(item);
     Alert.alert(
       'Đã hẹn nhắc lại',
       `Ứng dụng sẽ báo lại sau 15 phút cho liều "${item.medicationName}".`
     );
   };
 
-  const takenCount = doses.filter((d) => d.status === 'taken').length;
-  const totalCount = doses.length;
+  const sortedDoses = useMemo(
+    () => [...doses].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime)),
+    [doses]
+  );
+
+  const takenCount = sortedDoses.filter((d) => d.status === 'taken').length;
+  const totalCount = sortedDoses.length;
   const progressPercent = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 0;
 
-  const morningDoses = doses.filter((d) => d.timeGroup === 'morning');
-  const noonDoses = doses.filter((d) => d.timeGroup === 'noon');
-  const eveningDoses = doses.filter((d) => d.timeGroup === 'evening');
+  const morningDoses = sortedDoses.filter((d) => d.timeGroup === 'morning');
+  const noonDoses = sortedDoses.filter((d) => d.timeGroup === 'noon');
+  const afternoonDoses = sortedDoses.filter((d) => d.timeGroup === 'afternoon');
+  const eveningDoses = sortedDoses.filter((d) => d.timeGroup === 'evening');
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-background">
@@ -176,7 +122,7 @@ export default function TodayScreen() {
             />
           </View>
 
-          {progressPercent === 100 && (
+          {progressPercent === 100 && totalCount > 0 && (
             <View className="flex-row items-center mt-2.5">
               <CheckCircle2 size={16} color="#10B981" />
               <Text className="text-xs text-emerald-600 dark:text-emerald-400 font-medium ml-1.5">
@@ -185,6 +131,27 @@ export default function TodayScreen() {
             </View>
           )}
         </Card>
+
+        {/* Trạng thái rỗng nếu chưa có lịch thuốc */}
+        {totalCount === 0 && (
+          <Card className="items-center justify-center py-10 px-4 border-border/70">
+            <CalendarCheck size={40} color="#94A3B8" strokeWidth={1.5} />
+            <Text className="text-base font-semibold text-foreground mt-3">
+              Chưa có lịch nhắc hôm nay
+            </Text>
+            <Text className="text-xs text-muted-foreground text-center mt-1 mb-4">
+              Hãy thêm thuốc mới hoặc đồng bộ từ đơn thuốc của dược sĩ gia đình.
+            </Text>
+            <Button
+              variant="default"
+              size="sm"
+              className="bg-primary px-4 rounded-xl"
+              onPress={() => router.push('/medication/add')}
+            >
+              <Text className="text-white font-semibold text-xs">+ Thêm thuốc ngay</Text>
+            </Button>
+          </Card>
+        )}
 
         {/* 1. Nhóm buổi Sáng */}
         {morningDoses.length > 0 && (
@@ -201,6 +168,7 @@ export default function TodayScreen() {
                 item={dose}
                 onTake={handleTakeDose}
                 onSnooze={handleSnoozeDose}
+                onUndoTake={handleUndoTakeDose}
               />
             ))}
           </View>
@@ -221,12 +189,34 @@ export default function TodayScreen() {
                 item={dose}
                 onTake={handleTakeDose}
                 onSnooze={handleSnoozeDose}
+                onUndoTake={handleUndoTakeDose}
               />
             ))}
           </View>
         )}
 
-        {/* 3. Nhóm buổi Tối */}
+        {/* 3. Nhóm buổi Chiều */}
+        {afternoonDoses.length > 0 && (
+          <View className="mb-4">
+            <View className="flex-row items-center mb-2.5">
+              <CloudSun size={18} color="#EA580C" strokeWidth={2.2} />
+              <Text className="text-base font-bold text-foreground ml-2">
+                Buổi chiều
+              </Text>
+            </View>
+            {afternoonDoses.map((dose) => (
+              <DoseCard
+                key={dose.id}
+                item={dose}
+                onTake={handleTakeDose}
+                onSnooze={handleSnoozeDose}
+                onUndoTake={handleUndoTakeDose}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* 4. Nhóm buổi Tối */}
         {eveningDoses.length > 0 && (
           <View className="mb-4">
             <View className="flex-row items-center mb-2.5">
@@ -241,6 +231,7 @@ export default function TodayScreen() {
                 item={dose}
                 onTake={handleTakeDose}
                 onSnooze={handleSnoozeDose}
+                onUndoTake={handleUndoTakeDose}
               />
             ))}
           </View>

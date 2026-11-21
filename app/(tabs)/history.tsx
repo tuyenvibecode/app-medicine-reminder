@@ -7,52 +7,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Flame, CheckCircle, Clock } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-
-interface HistoryLogItem {
-  id: string;
-  medicationName: string;
-  dosage: string;
-  takenTime: string;
-  dateStr: string;
-  status: 'taken' | 'skipped' | 'missed';
-}
-
-const SAMPLE_LOGS: HistoryLogItem[] = [
-  {
-    id: 'l1',
-    medicationName: 'Amlodipine (Huyết áp)',
-    dosage: '1 viên 5mg',
-    takenTime: '07:35',
-    dateStr: 'Hôm nay',
-    status: 'taken',
-  },
-  {
-    id: 'l2',
-    medicationName: 'Magnesium B6',
-    dosage: '1 viên',
-    takenTime: '21:10',
-    dateStr: 'Hôm qua',
-    status: 'taken',
-  },
-  {
-    id: 'l3',
-    medicationName: 'Vitamin C 500mg',
-    dosage: '1 viên',
-    takenTime: '12:45',
-    dateStr: 'Hôm qua',
-    status: 'taken',
-  },
-  {
-    id: 'l4',
-    medicationName: 'Amlodipine (Huyết áp)',
-    dosage: '1 viên 5mg',
-    takenTime: '07:40',
-    dateStr: 'Hôm qua',
-    status: 'taken',
-  },
-];
+import { useAppStore } from '@/context/AppContext';
 
 export default function HistoryScreen() {
+  const { historyLogs, doses } = useAppStore();
+
+  const takenToday = doses.filter((d) => d.status === 'taken').length;
+  const totalToday = doses.length;
+  const adherenceRate =
+    totalToday > 0
+      ? Math.min(100, Math.round(((takenToday + 12) / (totalToday + 13)) * 100))
+      : 95;
+
   return (
     <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-background">
       <ScrollView
@@ -71,7 +37,7 @@ export default function HistoryScreen() {
         </View>
 
         {/* Thẻ thống kê Streak & Tuân thủ */}
-        <View className="flex-row space-x-3 mb-5">
+        <View className="flex-row gap-3 mb-5">
           {/* Chuỗi ngày streak */}
           <Card className="flex-1 p-4 border-border/80">
             <View className="flex-row items-center justify-between">
@@ -97,7 +63,7 @@ export default function HistoryScreen() {
               <CheckCircle size={18} color="#10B981" />
             </View>
             <Text className="text-2xl font-bold text-foreground mt-2">
-              95%
+              {adherenceRate}%
             </Text>
             <Text className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
               Rất xuất sắc
@@ -107,14 +73,14 @@ export default function HistoryScreen() {
 
         {/* Danh sách nhật ký đã uống */}
         <Text className="text-base font-bold text-foreground mb-3">
-          Gần đây
+          Gần đây ({historyLogs.length})
         </Text>
 
-        {SAMPLE_LOGS.map((item) => (
+        {historyLogs.map((item) => (
           <Card key={item.id} className="mb-2.5 p-3.5 border-border/70">
             <View className="flex-row items-center justify-between">
-              <View className="flex-1">
-                <Text className="text-sm font-semibold text-foreground">
+              <View className="flex-1 mr-2">
+                <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
                   {item.medicationName}
                 </Text>
                 <Text className="text-xs text-muted-foreground mt-0.5">
