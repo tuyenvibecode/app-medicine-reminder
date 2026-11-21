@@ -2,7 +2,7 @@
 // Màn hình Lên đơn thuốc dành cho Dược sĩ gia đình
 // Tìm kiếm thuốc từ data chi_thuoc.json, chọn số lượng viên và xuất Phiếu Note Toa thuốc có ảnh
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,13 @@ import {
   Modal,
   Alert,
   Share,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
+import { captureRef, releaseCapture } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 import {
   Search,
   Plus,
@@ -28,6 +31,7 @@ import {
   X,
   ChevronRight,
   Share2,
+  Image as ImageIcon,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Card } from '@/components/ui/card';
@@ -58,6 +62,8 @@ export default function CreatePrescriptionScreen() {
   const [noteTitle, setNoteTitle] = useState('Phiếu mua thuốc');
   const [generalInstructions, setGeneralInstructions] = useState('');
   const [prescriptionItems, setPrescriptionItems] = useState<PrescriptionMedicineItem[]>([]);
+  const [isCapturingImage, setIsCapturingImage] = useState(false);
+  const noteViewRef = useRef<View>(null);
 
   // Tìm kiếm thuốc & bộ lọc thuốc không kê đơn (an toàn y tế rule 04)
   const [searchQuery, setSearchQuery] = useState('');
@@ -235,6 +241,52 @@ export default function CreatePrescriptionScreen() {
       });
     } catch {
       Alert.alert('Lỗi', 'Không thể mở bảng chia sẻ trên thiết bị này.');
+    }
+  };
+
+  // Chia sẻ phiếu note dưới dạng HÌNH ẢNH (chỉ tạo file tạm trong RAM/cache rồi tự xoá ngay sau khi gửi, không lưu vào DB hay bộ nhớ máy)
+  const handleShareNoteImage = async () => {
+    if (prescriptionItems.length === 0) {
+      Alert.alert('Chưa có thuốc', 'Vui lòng chọn ít nhất một loại thuốc trước khi chia sẻ.');
+      return;
+    }
+
+    if (!noteViewRef.current) return;
+
+    try {
+      setIsCapturingImage(true);
+      try {
+        Haptics.selectionAsync();
+      } catch {}
+
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Không hỗ trợ', 'Thiết bị hiện tại không hỗ trợ chia sẻ file ảnh.');
+        return;
+      }
+
+      // Chụp khung tờ giấy Note ra file ảnh PNG tạm thời (tmpfile)
+      const tmpUri = await captureRef(noteViewRef, {
+        format: 'png',
+        quality: 0.95,
+        result: 'tmpfile',
+      });
+
+      try {
+        await Sharing.shareAsync(tmpUri, {
+          mimeType: 'image/png',
+          dialogTitle: 'Gửi ảnh phiếu mua thuốc',
+        });
+      } finally {
+        // Giải phóng ngay file ảnh tạm để tuyệt đối không làm đầy bộ nhớ máy
+        try {
+          releaseCapture(tmpUri);
+        } catch {}
+      }
+    } catch {
+      Alert.alert('Thông báo', 'Không thể chụp ảnh phiếu lúc này. Vui lòng thử lại.');
+    } finally {
+      setIsCapturingImage(false);
     }
   };
 
@@ -657,6 +709,8 @@ export default function CreatePrescriptionScreen() {
           >
             {/* Tờ giấy Note tối giản, rõ ràng để đưa cho dược sĩ ngoài tiệm thuốc */}
             <View
+              ref={noteViewRef}
+              collapsable={false}
               style={{
                 backgroundColor: '#FFFDF7',
                 borderRadius: 20,
@@ -832,12 +886,13 @@ export default function CreatePrescriptionScreen() {
               </View>
             </View>
 
-            {/* Các nút hành động: Chia sẻ nhanh qua Zalo/Tin nhắn & Thêm lịch nhắc */}
+            {/* Các nút hành động: Chia sẻ Hình ảnh / Văn bản & Thêm lịch nhắc */}
             <View className="gap-3 mb-6">
-              {/* Nút 1 (Chính): Chia sẻ phiếu cho người khác cầm đi mua */}
+              {/* Nút 1 (Chính): Chia sẻ bằng HÌNH ẢNH tờ giấy Note (có cả ảnh hộp thuốc, tự xoá file tạm sau khi gửi) */}
               <TouchableOpacity
                 activeOpacity={0.85}
-                onPress={handleShareNote}
+                disabled={isCapturingImage}
+                onPress={handleShareNoteImage}
                 style={{
                   backgroundColor: '#0D9488',
                   height: 54,
@@ -845,18 +900,53 @@ export default function CreatePrescriptionScreen() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  opacity: isCapturingImage ? 0.7 : 1,
                 }}
               >
-                <Share2 size={20} color="#FFFFFF" strokeWidth={2.2} />
+                {isCapturingImage ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <ImageIcon size={20} color="#FFFFFF" strokeWidth={2.2} />
+                    <Text
+                      style={{
+                        color: '#FFFFFF',
+                        fontWeight: '700',
+                        fontSize: 16,
+                        marginLeft: 8,
+                      }}
+                    >
+                      Chia sẻ bằng Hình ảnh (Zalo / Messenger)
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {/* Nút 2: Chia sẻ bằng Văn bản (Chữ) */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleShareNote}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1.5,
+                  borderColor: '#0D9488',
+                  height: 48,
+                  borderRadius: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Share2 size={18} color="#0D9488" strokeWidth={2.2} />
                 <Text
                   style={{
-                    color: '#FFFFFF',
+                    color: '#0D9488',
                     fontWeight: '700',
-                    fontSize: 16,
+                    fontSize: 14,
                     marginLeft: 8,
                   }}
                 >
-                  Chia sẻ phiếu (Zalo / Tin nhắn)
+                  Chia sẻ dạng Chữ (Tin nhắn / Copy)
                 </Text>
               </TouchableOpacity>
 
