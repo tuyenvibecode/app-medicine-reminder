@@ -63,7 +63,8 @@ export default function CreatePrescriptionScreen() {
   const [generalInstructions, setGeneralInstructions] = useState('');
   const [prescriptionItems, setPrescriptionItems] = useState<PrescriptionMedicineItem[]>([]);
   const [isCapturingImage, setIsCapturingImage] = useState(false);
-  const noteViewRef = useRef<View>(null);
+  // Dùng ComponentRef<typeof View> để tương thích với kiểu View của React 19 / React Native 0.88
+  const noteViewRef = useRef<React.ComponentRef<typeof View>>(null);
 
   // Tìm kiếm thuốc & bộ lọc thuốc không kê đơn (an toàn y tế rule 04)
   const [searchQuery, setSearchQuery] = useState('');
