@@ -125,8 +125,8 @@ export function DoseCard({ item, onTake, onSnooze, onUndoTake }: DoseCardProps) 
         </View>
       ) : (
         <View className="flex-row items-center justify-between pt-2.5 mt-2 border-t border-border/40">
-          <Text className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-            Đã hoàn thành liều này đúng giờ
+          <Text className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex-1 mr-2">
+            ✓ Đã uống đúng giờ
           </Text>
           {onUndoTake && (
             <Button
