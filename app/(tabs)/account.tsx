@@ -117,7 +117,7 @@ export default function AccountScreen() {
               </View>
             </Card>
 
-            {/* 2. HỒ SƠ ĐƠN THUỐC BÁC SĨ KÊ (Lưu ảnh gốc sắc nét & ngày bắt đầu) */}
+            {/* 2. HỒ SƠ ĐƠN THUỐC CỦA BẠN (Lưu ảnh gốc sắc nét, AI tự điền & so sánh chỉ số) */}
             <Text className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 ml-1">
               Hồ sơ Y tế & Đơn thuốc
             </Text>
@@ -135,19 +135,19 @@ export default function AccountScreen() {
                     <View className="ml-3 flex-1">
                       <View className="flex-row items-center flex-wrap gap-1.5">
                         <Text className="text-base font-bold text-foreground">
-                          Đơn thuốc của Bác sĩ
+                          Đơn thuốc của bạn
                         </Text>
                         <Badge
                           variant="default"
                           label={
                             doctorPrescriptions.length > 0
                               ? `${doctorPrescriptions.length} đơn đã lưu`
-                              : 'Ảnh HD sắc nét'
+                              : 'AI & Ảnh HD'
                           }
                         />
                       </View>
                       <Text className="text-xs text-muted-foreground mt-1" numberOfLines={2}>
-                        Chụp & lưu ảnh gốc đơn thuốc bác sĩ kê kèm ngày bắt đầu điều trị
+                        Chụp ảnh toa thuốc tự điền thông tin & theo dõi chỉ số Huyết áp, Đường huyết
                       </Text>
                     </View>
                   </View>
@@ -230,18 +230,23 @@ export default function AccountScreen() {
                 <ChevronRight size={18} color="#94A3B8" />
               </TouchableOpacity>
 
-              {/* Mã mời gia đình của tôi */}
+              {/* Mã mời gia đình của tôi - Bố cục 2 dòng thoáng gọn kèm mũi tên điều hướng */}
               <TouchableOpacity
                 className="flex-row items-center justify-between py-3 border-b border-border/50"
                 onPress={() => router.push('/admin' as any)}
               >
-                <View className="flex-row items-center flex-1 mr-2">
-                  <QrCode size={18} color="#64748B" />
-                  <Text className="text-base font-medium text-foreground ml-3">
-                    Mã mời kết nối người nhà
-                  </Text>
+                <View className="flex-row items-center flex-1 mr-3">
+                  <QrCode size={18} color="#0D9488" />
+                  <View className="ml-3 flex-1">
+                    <Text className="text-base font-medium text-foreground">
+                      Mã mời kết nối người nhà
+                    </Text>
+                    <Text className="text-xs text-muted-foreground mt-0.5">
+                      Đang kết nối 4 thành viên gia đình
+                    </Text>
+                  </View>
                 </View>
-                <Badge variant="outline" label="4 thành viên" />
+                <ChevronRight size={18} color="#94A3B8" />
               </TouchableOpacity>
 
               {/* Đổi mật khẩu */}

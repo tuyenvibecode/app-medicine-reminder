@@ -133,14 +133,18 @@ export interface Prescription {
   status: 'active' | 'completed';
 }
 
-// Đơn thuốc giấy do Bác sĩ kê (lưu ảnh độ phân giải cao & ngày bắt đầu điều trị)
+// Đơn thuốc của bạn (lưu ảnh độ phân giải cao sắc nét, tự điền thông tin bằng AI & lưu chỉ số Huyết áp / Đường huyết để so sánh)
 export interface DoctorPrescription {
   id: string;
-  title: string; // Ví dụ: "Đơn thuốc Huyết áp & Tim mạch"
-  doctorOrHospital?: string; // Ví dụ: "BV Đại học Y Dược"
+  title: string; // Loại bệnh / Tên đơn (ví dụ: "Đơn thuốc Huyết áp", "Đơn thuốc Tiểu đường")
+  conditionType?: 'blood_pressure' | 'diabetes' | 'general'; // Phân loại để so sánh chỉ số
+  medicationsText?: string; // Tên các thuốc trong đơn (AI đọc tự điền hoặc nhập tay)
+  bloodPressureSystolic?: number | null; // Huyết áp tâm thu (ví dụ: 130 mmHg)
+  bloodPressureDiastolic?: number | null; // Huyết áp tâm trương (ví dụ: 85 mmHg)
+  bloodSugar?: number | null; // Chỉ số đường huyết (ví dụ: 6.4 mmol/L)
   startDate: string; // Ngày bắt đầu khởi tạo đơn thuốc (ví dụ: "21/11/2026")
   imageUri: string; // Ảnh chụp sắc nét độ phân giải gốc
-  notes?: string;
+  notes?: string; // Ghi chú tái khám (AI tự điền hoặc chỉnh sửa)
   createdAt: string;
 }
 
