@@ -14,12 +14,13 @@ interface CustomTabBarProps {
     index: number;
     routes: { key: string; name: string }[];
   };
-  navigation: {
+  navigateToTab?: (routeKey: string) => void;
+  navigation?: {
     navigate: (name: string) => void;
   };
 }
 
-function CustomFloatingTabBar({ state, navigation }: CustomTabBarProps) {
+function CustomFloatingTabBar({ state, navigateToTab, navigation }: CustomTabBarProps) {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -30,7 +31,16 @@ function CustomFloatingTabBar({ state, navigation }: CustomTabBarProps) {
     try {
       Haptics.selectionAsync();
     } catch {}
-    navigation.navigate(routeName);
+
+    const targetRoute = state.routes.find((r) => r.name === routeName);
+    if (targetRoute && typeof navigateToTab === 'function') {
+      navigateToTab(targetRoute.key);
+    } else if (navigation && typeof navigation.navigate === 'function') {
+      navigation.navigate(routeName);
+    } else {
+      const path = routeName === 'index' ? '/(tabs)' : `/(tabs)/${routeName}`;
+      router.navigate(path as any);
+    }
   };
 
   // Bấm nút Camera ở chính giữa: Mở ngay màn Đơn thuốc của bạn kèm kích hoạt Camera chụp đơn
