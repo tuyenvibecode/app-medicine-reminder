@@ -934,7 +934,8 @@ export default function CreatePrescriptionScreen() {
                 onPress={handleShareNoteImage}
                 style={{
                   backgroundColor: '#0D9488',
-                  height: 54,
+                  height: 50,
+                  paddingHorizontal: 16,
                   borderRadius: 16,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -945,19 +946,20 @@ export default function CreatePrescriptionScreen() {
                 {isCapturingImage ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <>
-                    <ImageIcon size={20} color="#FFFFFF" strokeWidth={2.2} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                    <ImageIcon size={18} color="#FFFFFF" strokeWidth={2.2} />
                     <Text
+                      numberOfLines={1}
                       style={{
                         color: '#FFFFFF',
                         fontWeight: '700',
-                        fontSize: 16,
+                        fontSize: 14,
                         marginLeft: 8,
                       }}
                     >
-                      Chia sẻ bằng Hình ảnh (Zalo / Messenger)
+                      Chia sẻ dạng Hình ảnh (Zalo)
                     </Text>
-                  </>
+                  </View>
                 )}
               </TouchableOpacity>
 
@@ -970,23 +972,27 @@ export default function CreatePrescriptionScreen() {
                   borderWidth: 1.5,
                   borderColor: '#0D9488',
                   height: 48,
+                  paddingHorizontal: 16,
                   borderRadius: 16,
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Share2 size={18} color="#0D9488" strokeWidth={2.2} />
-                <Text
-                  style={{
-                    color: '#0D9488',
-                    fontWeight: '700',
-                    fontSize: 14,
-                    marginLeft: 8,
-                  }}
-                >
-                  Chia sẻ dạng Chữ (Tin nhắn / Copy)
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                  <Share2 size={18} color="#0D9488" strokeWidth={2.2} />
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      color: '#0D9488',
+                      fontWeight: '700',
+                      fontSize: 14,
+                      marginLeft: 8,
+                    }}
+                  >
+                    Chia sẻ dạng Chữ (Tin nhắn / Copy)
+                  </Text>
+                </View>
               </TouchableOpacity>
 
               {/* Hàng nút phụ: Thêm thuốc khác hoặc Đồng bộ vào lịch nhắc */}
