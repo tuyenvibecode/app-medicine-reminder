@@ -12,6 +12,7 @@ import { PortalHost } from '@rn-primitives/portal';
 import * as SplashScreen from 'expo-splash-screen';
 import { setupNotificationChannels } from '@/lib/notifications';
 import { AppProvider } from '@/context/AppContext';
+import { SecurityGate } from '@/components/SecurityGate';
 import { NAV_THEME } from '@/theme';
 
 // Ngăn màn hình splash tự biến mất trước khi load xong tài nguyên
@@ -56,45 +57,47 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AppProvider>
         <ThemeProvider value={navigationTheme}>
-          <View style={{ flex: 1 }} className="flex-1 bg-background">
-            <StatusBar style={isDark ? 'light' : 'dark'} />
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen
-                name="(auth)/login"
-                options={{
-                  presentation: 'modal',
-                  headerShown: false,
-                }}
-              />
-              <Stack.Screen
-                name="medication/add"
-                options={{
-                  presentation: 'modal',
-                  headerShown: false,
-                }}
-              />
-              <Stack.Screen
-                name="admin/index"
-                options={{
-                  headerShown: false,
-                }}
-              />
-              <Stack.Screen
-                name="prescription/create"
-                options={{
-                  headerShown: false,
-                }}
-              />
-              <Stack.Screen
-                name="doctor-prescriptions/index"
-                options={{
-                  headerShown: false,
-                }}
-              />
-            </Stack>
-            <PortalHost />
-          </View>
+          <SecurityGate>
+            <View style={{ flex: 1 }} className="flex-1 bg-background">
+              <StatusBar style={isDark ? 'light' : 'dark'} />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen
+                  name="(auth)/login"
+                  options={{
+                    presentation: 'modal',
+                    headerShown: false,
+                  }}
+                />
+                <Stack.Screen
+                  name="medication/add"
+                  options={{
+                    presentation: 'modal',
+                    headerShown: false,
+                  }}
+                />
+                <Stack.Screen
+                  name="admin/index"
+                  options={{
+                    headerShown: false,
+                  }}
+                />
+                <Stack.Screen
+                  name="prescription/create"
+                  options={{
+                    headerShown: false,
+                  }}
+                />
+                <Stack.Screen
+                  name="doctor-prescriptions/index"
+                  options={{
+                    headerShown: false,
+                  }}
+                />
+              </Stack>
+              <PortalHost />
+            </View>
+          </SecurityGate>
         </ThemeProvider>
       </AppProvider>
     </QueryClientProvider>

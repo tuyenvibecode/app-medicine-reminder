@@ -96,10 +96,12 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
 /**
  * Đặt lịch thông báo nhắc lại sau 15 phút (Snooze)
+ * Hỗ trợ ẩn tên thuốc trên màn hình khoá khi người dùng bật chế độ riêng tư.
  */
 export async function scheduleSnoozeNotification(
   medicationName: string,
-  dosage: string
+  dosage: string,
+  hideDetails = false
 ): Promise<string | null> {
   try {
     const granted = await requestNotificationPermissions();
@@ -107,8 +109,8 @@ export async function scheduleSnoozeNotification(
 
     return await scheduleNotificationAsync({
       content: {
-        title: `Đến giờ uống thuốc: ${medicationName}`,
-        body: `Liều lượng: ${dosage}`,
+        title: hideDetails ? 'Đến giờ uống thuốc' : `Đến giờ uống thuốc: ${medicationName}`,
+        body: hideDetails ? 'Mở ứng dụng để xem chi tiết liều thuốc của bạn' : `Liều lượng: ${dosage}`,
         categoryIdentifier: CATEGORY_MEDICATION_REMINDER,
         sound: 'default',
       },
@@ -125,12 +127,14 @@ export async function scheduleSnoozeNotification(
 
 /**
  * Đặt lịch nhắc uống thuốc hàng ngày theo giờ:phút
+ * Hỗ trợ ẩn tên thuốc trên màn hình khoá khi bật chế độ riêng tư.
  */
 export async function scheduleDailyReminder(
   medicationName: string,
   dosage: string,
   hour: number,
-  minute: number
+  minute: number,
+  hideDetails = false
 ): Promise<string | null> {
   try {
     const granted = await requestNotificationPermissions();
@@ -138,8 +142,10 @@ export async function scheduleDailyReminder(
 
     return await scheduleNotificationAsync({
       content: {
-        title: `Nhắc uống thuốc: ${medicationName}`,
-        body: dosage || 'Đã đến giờ uống thuốc của bạn',
+        title: hideDetails ? 'Đến giờ uống thuốc' : `Nhắc uống thuốc: ${medicationName}`,
+        body: hideDetails
+          ? 'Mở ứng dụng để xem chi tiết liều thuốc của bạn'
+          : dosage || 'Đã đến giờ uống thuốc của bạn',
         categoryIdentifier: CATEGORY_MEDICATION_REMINDER,
         sound: 'default',
       },

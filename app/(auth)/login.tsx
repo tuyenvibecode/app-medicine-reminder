@@ -29,22 +29,39 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Xử lý đăng nhập bằng mã gia đình
-  const handleInviteCodeLogin = () => {
-    if (!inviteCode.trim()) {
-      Alert.alert('Chưa nhập mã', 'Vui lòng nhập mã mời gia đình 6 ký tự (ví dụ: GD-8812).');
+  // Xử lý đăng nhập bằng mã gia đình (gọi hàm RPC join_household của Supabase nếu đã kết nối)
+  const handleInviteCodeLogin = async () => {
+    const cleanCode = inviteCode.trim();
+    if (!cleanCode) {
+      Alert.alert('Chưa nhập mã', 'Vui lòng nhập mã mời gia đình (ví dụ: GD-8812).');
       return;
     }
 
+    setIsLoading(true);
     try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+      if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
+        const { error } = await supabase.rpc('join_household', { p_code: cleanCode });
+        if (error) {
+          Alert.alert('Mã mời không hợp lệ', error.message || 'Mã mời đã hết hạn hoặc đã được sử dụng.');
+          return;
+        }
+      }
 
-    Alert.alert(
-      'Kết nối thành công!',
-      `Chào mừng bạn tham gia Gia đình với mã ${inviteCode.toUpperCase()}!\nLịch uống thuốc và hồ sơ đã được đồng bộ.`,
-      [{ text: 'Bắt đầu sử dụng', onPress: () => router.back() }]
-    );
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+
+      Alert.alert(
+        'Kết nối thành công!',
+        `Chào mừng bạn tham gia Gia đình với mã ${cleanCode.toUpperCase()}!\nLịch uống thuốc và hồ sơ đã được đồng bộ.`,
+        [{ text: 'Bắt đầu sử dụng', onPress: () => router.back() }]
+      );
+    } catch (err: any) {
+      Alert.alert('Lỗi', err?.message || 'Không thể kết nối mã gia đình lúc này.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Xử lý đăng nhập bằng Email / Mật khẩu

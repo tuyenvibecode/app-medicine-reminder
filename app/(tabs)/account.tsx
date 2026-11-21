@@ -1,7 +1,7 @@
 // app/(tabs)/account.tsx
 // Màn hình "Tài khoản", Lưu trữ Đơn thuốc Bác sĩ & Trung tâm Quản trị Gia đình
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -30,25 +30,53 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '@/context/AppContext';
+import { supabase } from '@/lib/supabase';
 
 export default function AccountScreen() {
   const router = useRouter();
   const { doctorPrescriptions, reminderSettings } = useAppStore();
 
-  // Trạng thái mô phỏng: Đã đăng nhập với tư cách Chủ gia đình / Admin
+  // Trạng thái phiên đăng nhập: đồng bộ với Supabase Auth nếu đã cấu hình, hỗ trợ chế độ offline gia đình
   const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [userEmail, setUserEmail] = useState('tuyen55@giadinh.local');
   const [inviteCodeInput, setInviteCodeInput] = useState('');
 
-  // Xử lý đăng xuất
+  useEffect(() => {
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+    if (!supabaseUrl || supabaseUrl.includes('placeholder')) return;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (data?.session?.user) {
+        setIsLoggedIn(true);
+        setUserEmail(data.session.user.email || 'tuyen55@giadinh.local');
+      }
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setIsLoggedIn(true);
+        setUserEmail(session.user.email || 'tuyen55@giadinh.local');
+      }
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Xử lý đăng xuất và xoá sạch token trong SecureStore
   const handleLogout = () => {
     Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?', [
       { text: 'Huỷ', style: 'cancel' },
       {
         text: 'Đăng xuất',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
           try {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          } catch {}
+          try {
+            await supabase.auth.signOut();
           } catch {}
           setIsLoggedIn(false);
         },
@@ -108,7 +136,7 @@ export default function AccountScreen() {
                     <Badge variant="default" label="Chủ hộ" className="ml-2" />
                   </View>
                   <Text className="text-sm text-muted-foreground mt-0.5">
-                    tuyen55@giadinh.local
+                    {userEmail}
                   </Text>
                   <Text className="text-xs text-primary font-medium mt-1">
                     Quản trị viên gia đình

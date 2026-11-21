@@ -464,10 +464,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Hẹn nhắc lại sau 15 phút qua thông báo hệ thống
-  const snoozeDose = useCallback((item: DoseTimelineItem) => {
-    scheduleSnoozeNotification(item.medicationName, item.dosage).catch(() => {});
-  }, []);
+  // Hẹn nhắc lại sau 15 phút qua thông báo hệ thống (tôn trọng cấu hình ẩn tên thuốc màn hình khoá)
+  const snoozeDose = useCallback(
+    (item: DoseTimelineItem) => {
+      scheduleSnoozeNotification(
+        item.medicationName,
+        item.dosage,
+        reminderSettings.hideDetailsOnLock
+      ).catch(() => {});
+    },
+    [reminderSettings.hideDetailsOnLock]
+  );
 
   // Nạp thêm số lượng viên vào tủ thuốc và đồng bộ với lịch hôm nay
   const refillMedication = useCallback((medicationId: string, addCount: number) => {
@@ -524,7 +531,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const hour = parseInt(hStr || '7', 10);
       const minute = parseInt(mStr || '30', 10);
 
-      scheduleDailyReminder(newMed.name, cleanDosage, hour, minute).catch(() => {});
+      scheduleDailyReminder(
+        newMed.name,
+        cleanDosage,
+        hour,
+        minute,
+        reminderSettings.hideDetailsOnLock
+      ).catch(() => {});
 
       return {
         id: `dose-${Date.now()}-${idx}`,
@@ -546,7 +559,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
 
     setDoses((prev) => [...prev, ...newDoses]);
-  }, []);
+  }, [reminderSettings.hideDetailsOnLock]);
 
   // Đồng bộ toàn bộ thuốc từ Phiếu đơn thuốc vào Tủ thuốc và Lịch nhắc hôm nay
   const syncPrescriptionToReminders = useCallback(
@@ -602,7 +615,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             item.name,
             item.dosageInstruction,
             parseInt(hStr || '8', 10),
-            parseInt(mStr || '0', 10)
+            parseInt(mStr || '0', 10),
+            reminderSettings.hideDetailsOnLock
           ).catch(() => {});
 
           addedDoses.push({

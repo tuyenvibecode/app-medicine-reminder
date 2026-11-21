@@ -41,13 +41,30 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Kiểm tra header Authorization (JWT của người dùng đã đăng nhập)
+    // 1. Xác thực JWT thật với Supabase Auth (chặn mọi token giả mạo hoặc đã hết hạn)
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Thiếu thông tin xác thực JWT' }), {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Thiếu thông tin xác thực JWT hợp lệ' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    if (supabaseUrl && supabaseAnonKey) {
+      const userCheckRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        headers: {
+          Authorization: authHeader,
+          apikey: supabaseAnonKey,
+        },
+      });
+      if (!userCheckRes.ok) {
+        return new Response(JSON.stringify({ error: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     const apiKey = Deno.env.get('GEMINI_API_KEY');
@@ -60,6 +77,15 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     const { imageBase64, mimeType = 'image/jpeg', preferredModel } = body || {};
+
+    // 2. Chỉ chấp nhận đúng định dạng ảnh hợp lệ
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedMimeTypes.includes(mimeType)) {
+      return new Response(JSON.stringify({ error: 'Định dạng ảnh không được hỗ trợ' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!imageBase64 || typeof imageBase64 !== 'string') {
       return new Response(JSON.stringify({ error: 'Thiếu dữ liệu ảnh cần đọc' }), {

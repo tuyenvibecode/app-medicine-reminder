@@ -1,7 +1,7 @@
 // app/(tabs)/settings.tsx
 // Màn hình Cấu hình Thời gian nhắc uống thuốc, Nhạc chuông báo thức & Bảo mật vân tay
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ import {
   CloudSun,
   Moon,
   X,
+  ShieldAlert,
 } from 'lucide-react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Haptics from 'expo-haptics';
@@ -35,6 +36,11 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/context/AppContext';
 import { requestNotificationPermissions, CATEGORY_MEDICATION_REMINDER } from '@/lib/notifications';
+import {
+  loadSecurityPreferences,
+  saveBiometricsEnabled,
+  savePrivacyShieldEnabled,
+} from '@/lib/securityConfig';
 import { AI_MODEL_FALLBACK_CHAIN } from '@/services/aiPrescriptionService';
 import { Input } from '@/components/ui/input';
 import type { ReminderSettings } from '@/types';
@@ -72,6 +78,15 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { reminderSettings, updateReminderSettings } = useAppStore();
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
+  const [privacyShieldEnabled, setPrivacyShieldEnabled] = useState(true);
+
+  // Tải trạng thái bảo mật đã lưu trong SecureStore (Keystore Android)
+  useEffect(() => {
+    loadSecurityPreferences().then((prefs) => {
+      setBiometricsEnabled(prefs.biometricsEnabled);
+      setPrivacyShieldEnabled(prefs.privacyShieldEnabled);
+    });
+  }, []);
 
   // Modal chỉnh giờ cho từng buổi
   const [editingSlot, setEditingSlot] = useState<{
@@ -140,7 +155,7 @@ export default function SettingsScreen() {
     }
   };
 
-  // Xử lý bật/tắt sinh trắc học
+  // Xử lý bật/tắt sinh trắc học và lưu vĩnh viễn vào SecureStore
   const handleToggleBiometrics = async (value: boolean) => {
     if (value) {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -161,11 +176,19 @@ export default function SettingsScreen() {
 
       if (result.success) {
         setBiometricsEnabled(true);
-        Alert.alert('Thành công', 'Đã bật bảo vệ bằng sinh trắc học.');
+        await saveBiometricsEnabled(true);
+        Alert.alert('Thành công', 'Đã bật khoá bảo vệ bằng sinh trắc học mỗi khi mở app.');
       }
     } else {
       setBiometricsEnabled(false);
+      await saveBiometricsEnabled(false);
     }
+  };
+
+  // Xử lý bật/tắt màn hình che đa nhiệm (Recent Apps Privacy Shield)
+  const handleTogglePrivacyShield = async (value: boolean) => {
+    setPrivacyShieldEnabled(value);
+    await savePrivacyShieldEnabled(value);
   };
 
   return (
@@ -432,7 +455,7 @@ export default function SettingsScreen() {
             />
           </View>
 
-          <View className="flex-row items-center justify-between pt-3">
+          <View className="flex-row items-center justify-between py-3 border-b border-border/50">
             <View className="flex-row items-center flex-1 mr-3">
               <Fingerprint size={20} color="#0D9488" />
               <View className="ml-3 flex-1">
@@ -440,13 +463,32 @@ export default function SettingsScreen() {
                   Khoá bằng vân tay / PIN
                 </Text>
                 <Text className="text-xs text-muted-foreground mt-0.5">
-                  Yêu cầu xác thực mỗi khi mở ứng dụng
+                  Yêu cầu xác thực mỗi khi mở ứng dụng (Lưu trong Keystore)
                 </Text>
               </View>
             </View>
             <Switch
               value={biometricsEnabled}
               onValueChange={handleToggleBiometrics}
+              trackColor={{ false: '#CBD5E1', true: '#0D9488' }}
+            />
+          </View>
+
+          <View className="flex-row items-center justify-between pt-3">
+            <View className="flex-row items-center flex-1 mr-3">
+              <ShieldAlert size={20} color="#0D9488" />
+              <View className="ml-3 flex-1">
+                <Text className="text-base font-semibold text-foreground">
+                  Che màn hình đa nhiệm (Recent Apps)
+                </Text>
+                <Text className="text-xs text-muted-foreground mt-0.5">
+                  Tự động ẩn thông tin thuốc khi chuyển sang ứng dụng khác
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={privacyShieldEnabled}
+              onValueChange={handleTogglePrivacyShield}
               trackColor={{ false: '#CBD5E1', true: '#0D9488' }}
             />
           </View>
