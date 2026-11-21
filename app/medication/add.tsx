@@ -209,7 +209,14 @@ export default function AddMedicationScreen() {
             <View className="items-center">
               <Image
                 source={{ uri: photoUri }}
-                className="h-32 w-32 rounded-3xl mb-3 border border-border"
+                style={{
+                  width: 128,
+                  height: 128,
+                  borderRadius: 24,
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                }}
                 contentFit="cover"
               />
               <View className="flex-row gap-2">

@@ -150,7 +150,14 @@ export default function MedicationsScreen() {
                       {item.image ? (
                         <Image
                           source={{ uri: item.image }}
-                          className="h-14 w-14 rounded-2xl bg-muted/20 border border-border"
+                          style={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 16,
+                            backgroundColor: '#F8FAFC',
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                          }}
                           contentFit="cover"
                         />
                       ) : (

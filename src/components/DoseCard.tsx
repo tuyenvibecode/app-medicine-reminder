@@ -29,7 +29,14 @@ export function DoseCard({ item, onTake, onSnooze, onUndoTake }: DoseCardProps) 
         {item.image ? (
           <Image
             source={{ uri: item.image }}
-            className="h-16 w-16 rounded-2xl bg-muted/20 border border-border"
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 16,
+              backgroundColor: '#F8FAFC',
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+            }}
             contentFit="cover"
           />
         ) : (
