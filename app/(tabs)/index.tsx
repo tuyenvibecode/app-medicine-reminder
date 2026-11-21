@@ -1,7 +1,7 @@
 // app/(tabs)/index.tsx
 // Màn hình chính "Hôm nay"
-// Tích hợp Thanh Lịch Full Tháng có Swiper trượt ngang mượt mà (xem lại tuần trước / cả tháng),
-// nút chuyển Tháng trước/sau, nút quay về "Hôm nay" 1-chạm và tự động cuộn tới ngày hiện tại.
+// Thanh Lịch hiển thị đúng 1 Tuần (7 ngày T2 -> CN vừa khít màn hình) và có Swiper phân trang (Paging):
+// Khi vuốt ngang qua trái hoặc phải sẽ nhảy gọn từng tuần (7 ngày T2 -> CN của tuần trước / tuần sau).
 
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import {
@@ -11,6 +11,8 @@ import {
   Alert,
   TouchableOpacity,
   Dimensions,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -27,15 +29,11 @@ import {
   RotateCcw,
 } from 'lucide-react-native';
 import {
-  startOfMonth,
-  endOfMonth,
-  eachDayOfInterval,
+  startOfWeek,
+  addDays,
+  addWeeks,
   isSameDay,
-  isSameMonth,
-  addMonths,
-  subMonths,
   format,
-  getDay,
 } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { DoseCard } from '@/components/DoseCard';
@@ -44,91 +42,121 @@ import { Card } from '@/components/ui/card';
 import { useAppStore } from '@/context/AppContext';
 import type { DoseTimelineItem } from '@/types';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const DAY_ITEM_WIDTH = 50;
-const DAY_ITEM_GAP = 8;
+const VIETNAMESE_WEEKDAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+const INITIAL_CONTAINER_WIDTH = Dimensions.get('window').width - 32;
 
-// getDay() của date-fns: 0 = Chủ nhật, 1 = Thứ 2 ... 6 = Thứ 7
-function getVietnameseWeekday(date: Date): string {
-  const day = getDay(date);
-  if (day === 0) return 'CN';
-  return `T${day + 1}`;
-}
+// Số tuần tạo sẵn trong Swiper (-12 tuần trước đến +12 tuần sau = ~6 tháng trượt mượt mà)
+const WEEK_OFFSETS = Array.from({ length: 25 }, (_, i) => i - 12);
+const TODAY_WEEK_INDEX = 12; // Vị trí tuần hiện tại (offset = 0)
 
 export default function TodayScreen() {
   const router = useRouter();
   const { doses, takeDose, undoTakeDose, snoozeDose } = useAppStore();
 
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
-  const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
-  const monthScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const [activeWeekIndex, setActiveWeekIndex] = useState<number>(TODAY_WEEK_INDEX);
+  const [pageWidth, setPageWidth] = useState<number>(INITIAL_CONTAINER_WIDTH);
 
-  // Tạo danh sách toàn bộ các ngày trong tháng đang xem (01 -> 30/31)
-  const monthDays = useMemo(() => {
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-    const days = eachDayOfInterval({ start, end });
+  const weekPagerRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+
+  // Danh sách các trang tuần, mỗi trang gồm đúng 7 ngày (T2 -> CN)
+  const weeksPages = useMemo(() => {
     const today = new Date();
+    const baseMonday = startOfWeek(today, { weekStartsOn: 1 });
 
-    return days.map((dateObj) => ({
-      date: dateObj,
-      dayNumberStr: format(dateObj, 'dd'),
-      dayLabel: getVietnameseWeekday(dateObj),
-      isToday: isSameDay(dateObj, today),
-    }));
-  }, [currentMonth]);
-
-  // Tự động trượt (scroll) thanh Swiper đến vị trí ngày đang chọn (nằm giữa màn hình)
-  const scrollToDate = useCallback((targetDate: Date, animated = true) => {
-    const dayOfMonth = targetDate.getDate(); // 1..31
-    const itemTotalWidth = DAY_ITEM_WIDTH + DAY_ITEM_GAP;
-    const targetOffset = Math.max(
-      0,
-      (dayOfMonth - 1) * itemTotalWidth - SCREEN_WIDTH / 2 + DAY_ITEM_WIDTH / 2 + 16
-    );
-    setTimeout(() => {
-      monthScrollRef.current?.scrollTo({ x: targetOffset, animated });
-    }, 80);
+    return WEEK_OFFSETS.map((offset) => {
+      const weekMonday = addWeeks(baseMonday, offset);
+      const days = Array.from({ length: 7 }, (_, dIdx) => {
+        const dateObj = addDays(weekMonday, dIdx);
+        return {
+          date: dateObj,
+          dayNumberStr: format(dateObj, 'dd'),
+          dayLabel: VIETNAMESE_WEEKDAYS[dIdx],
+          isToday: isSameDay(dateObj, today),
+        };
+      });
+      return {
+        offset,
+        weekMonday,
+        weekSunday: addDays(weekMonday, 6),
+        days,
+      };
+    });
   }, []);
 
+  // Cuộn Swiper tới đúng trang tuần thứ `index`
+  const scrollToWeekIndex = useCallback(
+    (index: number, animated = true) => {
+      const clamped = Math.max(0, Math.min(weeksPages.length - 1, index));
+      weekPagerRef.current?.scrollTo({
+        x: clamped * pageWidth,
+        animated,
+      });
+    },
+    [pageWidth, weeksPages.length]
+  );
+
+  // Đặt vị trí ban đầu ở đúng tuần hiện tại khi mở màn hình
   useEffect(() => {
-    scrollToDate(selectedDate, false);
-    // Chỉ cuộn lần đầu khi mở màn hình
+    const timer = setTimeout(() => {
+      scrollToWeekIndex(activeWeekIndex, false);
+    }, 50);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pageWidth]);
 
-  // Chuyển sang tháng trước / tháng sau
-  const handlePrevMonth = () => {
+  // Xử lý khi người dùng vuốt ngang kết thúc 1 trang tuần
+  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (pageWidth <= 0) return;
+    const newIndex = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+    if (newIndex >= 0 && newIndex < weeksPages.length && newIndex !== activeWeekIndex) {
+      try {
+        Haptics.selectionAsync();
+      } catch {}
+      setActiveWeekIndex(newIndex);
+      // Nếu tuần mới là tuần hiện tại thì chọn Hôm nay, ngược lại chọn Thứ 2 của tuần đó
+      const targetWeek = weeksPages[newIndex];
+      const todayInWeek = targetWeek.days.find((d) => d.isToday);
+      setSelectedDate(todayInWeek ? todayInWeek.date : targetWeek.weekMonday);
+    }
+  };
+
+  // Nút chuyển lùi 1 tuần / tiến 1 tuần
+  const handlePrevWeek = () => {
+    if (activeWeekIndex <= 0) return;
     try {
       Haptics.selectionAsync();
     } catch {}
-    const prev = subMonths(currentMonth, 1);
-    setCurrentMonth(prev);
-    const firstDay = startOfMonth(prev);
-    setSelectedDate(firstDay);
-    scrollToDate(firstDay, true);
+    const nextIdx = activeWeekIndex - 1;
+    setActiveWeekIndex(nextIdx);
+    scrollToWeekIndex(nextIdx, true);
+    const targetWeek = weeksPages[nextIdx];
+    const todayInWeek = targetWeek.days.find((d) => d.isToday);
+    setSelectedDate(todayInWeek ? todayInWeek.date : targetWeek.weekMonday);
   };
 
-  const handleNextMonth = () => {
+  const handleNextWeek = () => {
+    if (activeWeekIndex >= weeksPages.length - 1) return;
     try {
       Haptics.selectionAsync();
     } catch {}
-    const next = addMonths(currentMonth, 1);
-    setCurrentMonth(next);
-    const firstDay = startOfMonth(next);
-    setSelectedDate(firstDay);
-    scrollToDate(firstDay, true);
+    const nextIdx = activeWeekIndex + 1;
+    setActiveWeekIndex(nextIdx);
+    scrollToWeekIndex(nextIdx, true);
+    const targetWeek = weeksPages[nextIdx];
+    const todayInWeek = targetWeek.days.find((d) => d.isToday);
+    setSelectedDate(todayInWeek ? todayInWeek.date : targetWeek.weekMonday);
   };
 
-  // Quay về đúng ngày Hôm nay 1-chạm
+  // Nút nhảy ngay về tuần hiện tại & ngày Hôm nay
   const handleJumpToToday = () => {
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {}
     const today = new Date();
-    setCurrentMonth(today);
+    setActiveWeekIndex(TODAY_WEEK_INDEX);
     setSelectedDate(today);
-    scrollToDate(today, true);
+    scrollToWeekIndex(TODAY_WEEK_INDEX, true);
   };
 
   // Xử lý bấm "Đã uống" 1-chạm
@@ -174,6 +202,7 @@ export default function TodayScreen() {
   const afternoonDoses = sortedDoses.filter((d) => d.timeGroup === 'afternoon');
   const eveningDoses = sortedDoses.filter((d) => d.timeGroup === 'evening');
 
+  const currentWeekPage = weeksPages[activeWeekIndex] || weeksPages[TODAY_WEEK_INDEX];
   const isViewingToday = isSameDay(selectedDate, new Date());
 
   return (
@@ -189,10 +218,7 @@ export default function TodayScreen() {
             <Text className="text-xs font-semibold text-primary uppercase tracking-wider">
               {isViewingToday
                 ? `Hôm nay • ${format(selectedDate, 'dd/MM/yyyy')}`
-                : `${getVietnameseWeekday(selectedDate)} • Ngày ${format(
-                    selectedDate,
-                    'dd/MM/yyyy'
-                  )}`}
+                : `Ngày ${format(selectedDate, 'dd/MM/yyyy')}`}
             </Text>
             <Text className="text-2xl font-bold text-foreground tracking-tight">
               Lịch uống thuốc
@@ -210,7 +236,7 @@ export default function TodayScreen() {
           </Button>
         </View>
 
-        {/* Thanh điều khiển Tháng & Nút quay nhanh về Hôm nay */}
+        {/* Thanh hiển thị Tuần đang xem & Nút quay về Hôm nay */}
         <View
           style={{
             flexDirection: 'row',
@@ -221,48 +247,48 @@ export default function TodayScreen() {
         >
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TouchableOpacity
-              onPress={handlePrevMonth}
+              onPress={handlePrevWeek}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={{
-                height: 28,
-                width: 28,
+                height: 26,
+                width: 26,
                 borderRadius: 8,
                 backgroundColor: '#F1F5F9',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <ChevronLeft size={16} color="#0F172A" />
+              <ChevronLeft size={15} color="#0F172A" />
             </TouchableOpacity>
 
             <Text
               style={{
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: '700',
-                color: '#0F172A',
-                marginHorizontal: 10,
+                color: '#475569',
+                marginHorizontal: 8,
               }}
             >
-              Tháng {format(currentMonth, 'MM / yyyy')}
+              Tháng {format(currentWeekPage.weekMonday, 'MM/yyyy')} ({format(currentWeekPage.weekMonday, 'dd/MM')} - {format(currentWeekPage.weekSunday, 'dd/MM')})
             </Text>
 
             <TouchableOpacity
-              onPress={handleNextMonth}
+              onPress={handleNextWeek}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={{
-                height: 28,
-                width: 28,
+                height: 26,
+                width: 26,
                 borderRadius: 8,
                 backgroundColor: '#F1F5F9',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <ChevronRight size={16} color="#0F172A" />
+              <ChevronRight size={15} color="#0F172A" />
             </TouchableOpacity>
           </View>
 
-          {(!isViewingToday || !isSameMonth(currentMonth, new Date())) && (
+          {(!isViewingToday || activeWeekIndex !== TODAY_WEEK_INDEX) && (
             <TouchableOpacity
               onPress={handleJumpToToday}
               style={{
@@ -274,7 +300,7 @@ export default function TodayScreen() {
                 borderRadius: 999,
               }}
             >
-              <RotateCcw size={12} color="#0D9488" />
+              <RotateCcw size={11} color="#0D9488" />
               <Text
                 style={{
                   fontSize: 11,
@@ -283,114 +309,119 @@ export default function TodayScreen() {
                   marginLeft: 4,
                 }}
               >
-                Về hôm nay
+                Hôm nay
               </Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* THANH SWIPER LỊCH FULL THÁNG (Vuốt ngang xem lại tuần trước & cả tháng dễ dàng) */}
-        <ScrollView
-          ref={monthScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            gap: DAY_ITEM_GAP,
-            paddingVertical: 4,
-            paddingRight: 8,
+        {/* SWIPER LỊCH THEO TUẦN: Hiển thị sẵn đúng 1 tuần (7 ngày T2 -> CN), vuốt trái/phải nhảy từng tuần */}
+        <View
+          onLayout={(e) => {
+            const w = Math.round(e.nativeEvent.layout.width);
+            if (w > 0 && w !== pageWidth) {
+              setPageWidth(w);
+            }
           }}
-          style={{ marginBottom: 16 }}
+          style={{ width: '100%', marginBottom: 18 }}
         >
-          {monthDays.map((item) => {
-            const isSelected = isSameDay(item.date, selectedDate);
-            return (
-              <TouchableOpacity
-                key={item.dayNumberStr}
-                activeOpacity={0.8}
-                onPress={() => {
-                  try {
-                    Haptics.selectionAsync();
-                  } catch {}
-                  setSelectedDate(item.date);
-                  scrollToDate(item.date, true);
-                }}
+          <ScrollView
+            ref={weekPagerRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            onMomentumScrollEnd={handleMomentumScrollEnd}
+          >
+            {weeksPages.map((weekPage) => (
+              <View
+                key={`week-${weekPage.offset}`}
                 style={{
-                  width: DAY_ITEM_WIDTH,
-                  borderRadius: 16,
-                  padding: 5,
-                  paddingBottom: 9,
-                  alignItems: 'center',
-                  backgroundColor: isSelected ? '#0D9488' : '#FFFFFF',
-                  borderWidth: 1,
-                  borderColor: isSelected
-                    ? '#0D9488'
-                    : item.isToday
-                    ? '#0D9488'
-                    : '#E2E8F0',
+                  width: pageWidth,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  gap: 6,
                 }}
               >
-                {/* Ô vuông bo góc chứa số ngày (01..31) bên trên */}
-                <View
-                  style={{
-                    width: '100%',
-                    aspectRatio: 1,
-                    borderRadius: 11,
-                    backgroundColor: isSelected
-                      ? '#CCFBF1'
-                      : item.isToday
-                      ? '#F0FDFA'
-                      : '#F8FAFC',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      fontWeight: '800',
-                      color: isSelected
-                        ? '#0F766E'
-                        : item.isToday
-                        ? '#0D9488'
-                        : '#0F172A',
-                    }}
-                  >
-                    {item.dayNumberStr}
-                  </Text>
-                </View>
+                {weekPage.days.map((item) => {
+                  const isSelected = isSameDay(item.date, selectedDate);
+                  return (
+                    <TouchableOpacity
+                      key={item.dayLabel}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        try {
+                          Haptics.selectionAsync();
+                        } catch {}
+                        setSelectedDate(item.date);
+                      }}
+                      style={{
+                        flex: 1,
+                        borderRadius: 16,
+                        padding: 5,
+                        paddingBottom: 9,
+                        alignItems: 'center',
+                        backgroundColor: isSelected ? '#0D9488' : '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: isSelected
+                          ? '#0D9488'
+                          : item.isToday
+                          ? '#0D9488'
+                          : '#E2E8F0',
+                      }}
+                    >
+                      {/* Ô vuông bo góc chứa số ngày (01, 02...) bên trên */}
+                      <View
+                        style={{
+                          width: '100%',
+                          aspectRatio: 1,
+                          borderRadius: 11,
+                          backgroundColor: isSelected
+                            ? '#CCFBF1'
+                            : item.isToday
+                            ? '#F0FDFA'
+                            : '#F8FAFC',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 15,
+                            fontWeight: '800',
+                            color: isSelected
+                              ? '#0F766E'
+                              : item.isToday
+                              ? '#0D9488'
+                              : '#0F172A',
+                          }}
+                        >
+                          {item.dayNumberStr}
+                        </Text>
+                      </View>
 
-                {/* Nhãn Thứ (T2 -> T7, CN) bên dưới */}
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: isSelected ? '700' : '600',
-                    color: isSelected
-                      ? '#FFFFFF'
-                      : item.dayLabel === 'CN'
-                      ? '#EF4444'
-                      : '#64748B',
-                    marginTop: 6,
-                  }}
-                >
-                  {item.dayLabel}
-                </Text>
-
-                {/* Chấm nhỏ đánh dấu ngày Hôm nay */}
-                {item.isToday && (
-                  <View
-                    style={{
-                      width: 4,
-                      height: 4,
-                      borderRadius: 999,
-                      backgroundColor: isSelected ? '#FFFFFF' : '#0D9488',
-                      marginTop: 2,
-                    }}
-                  />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+                      {/* Nhãn Thứ (T2 -> T7, CN) bên dưới */}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: isSelected ? '700' : '600',
+                          color: isSelected
+                            ? '#FFFFFF'
+                            : item.dayLabel === 'CN'
+                            ? '#EF4444'
+                            : '#64748B',
+                          marginTop: 7,
+                        }}
+                      >
+                        {item.dayLabel}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* Thẻ tiến độ trong ngày */}
         <Card className="mb-5 bg-card border-border/80 p-4">
