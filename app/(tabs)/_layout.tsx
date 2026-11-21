@@ -8,9 +8,18 @@ import { View, Text, TouchableOpacity, useColorScheme, Platform } from 'react-na
 import { Tabs, useRouter } from 'expo-router';
 import { CalendarCheck, Pill, FileText, User, Camera } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
-function CustomFloatingTabBar({ state, navigation }: BottomTabBarProps) {
+interface CustomTabBarProps {
+  state: {
+    index: number;
+    routes: { key: string; name: string }[];
+  };
+  navigation: {
+    navigate: (name: string) => void;
+  };
+}
+
+function CustomFloatingTabBar({ state, navigation }: CustomTabBarProps) {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
