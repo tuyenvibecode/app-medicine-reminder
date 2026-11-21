@@ -61,7 +61,7 @@ export default function TodayScreen() {
 
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
-  const monthScrollRef = useRef<ScrollView>(null);
+  const monthScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
 
   // Tạo danh sách toàn bộ các ngày trong tháng đang xem (01 -> 30/31)
   const monthDays = useMemo(() => {
