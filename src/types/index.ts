@@ -148,7 +148,7 @@ export interface DoctorPrescription {
   createdAt: string;
 }
 
-// Cấu hình khung giờ nhắc mặc định & nhạc chuông
+// Cấu hình khung giờ nhắc mặc định, nhạc chuông & model AI dự phòng
 export interface ReminderSettings {
   morningTime: string; // "07:30"
   noonTime: string; // "12:00"
@@ -158,4 +158,5 @@ export interface ReminderSettings {
   ringtoneName: string;
   highPriorityAlarm: boolean;
   hideDetailsOnLock: boolean;
+  preferredAiModel: string; // Mặc định "gemini-4-hydrogen", cho phép đổi tự do nếu model thay đổi
 }

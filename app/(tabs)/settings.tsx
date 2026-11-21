@@ -35,6 +35,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/context/AppContext';
 import { requestNotificationPermissions, CATEGORY_MEDICATION_REMINDER } from '@/lib/notifications';
+import { AI_MODEL_FALLBACK_CHAIN } from '@/services/aiPrescriptionService';
+import { Input } from '@/components/ui/input';
 import type { ReminderSettings } from '@/types';
 
 const RINGTONE_OPTIONS: {
@@ -450,7 +452,68 @@ export default function SettingsScreen() {
           </View>
         </Card>
 
-        {/* 4. Giới thiệu ứng dụng */}
+        {/* 4. CẤU HÌNH AI ĐỌC ĐƠN THUỐC & CHUỖI MODEL DỰ PHÒNG (BACKUP) */}
+        <Text className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 ml-1">
+          Cấu hình AI & Dự phòng Model (Backup)
+        </Text>
+        <Card className="mb-5 p-4 border-border/80">
+          <Text className="text-xs text-muted-foreground mb-3 leading-relaxed">
+            Hệ thống tự động chạy theo <Text className="font-bold text-primary">chuỗi 4 tầng dự phòng</Text>. Nếu model chính bị đổi tên hoặc quá tải, app sẽ tự động chuyển sang các model kế tiếp hoặc chế độ Offline mà không bao giờ bị lỗi:
+          </Text>
+
+          {AI_MODEL_FALLBACK_CHAIN.map((m, idx) => {
+            const isSelected = reminderSettings.preferredAiModel === m.id;
+            return (
+              <TouchableOpacity
+                key={m.id}
+                activeOpacity={0.75}
+                onPress={() => {
+                  try {
+                    Haptics.selectionAsync();
+                  } catch {}
+                  updateReminderSettings({ preferredAiModel: m.id });
+                }}
+                className={`flex-row items-center justify-between py-2.5 ${
+                  idx < AI_MODEL_FALLBACK_CHAIN.length - 1 ? 'border-b border-border/40' : ''
+                }`}
+              >
+                <View className="flex-1 mr-2">
+                  <Text
+                    className={`text-sm font-bold ${
+                      isSelected ? 'text-primary' : 'text-foreground'
+                    }`}
+                  >
+                    {idx + 1}. {m.name}
+                  </Text>
+                  <Text className="text-xs text-muted-foreground mt-0.5">
+                    Mã model: {m.id} • {m.desc}
+                  </Text>
+                </View>
+
+                {isSelected && (
+                  <View className="h-6 w-6 rounded-full bg-primary/15 items-center justify-center">
+                    <Check size={14} color="#0D9488" strokeWidth={2.5} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+
+          <View className="mt-3 pt-3 border-t border-border/50">
+            <Text className="text-xs font-semibold text-foreground mb-1.5">
+              Hoặc tự nhập mã Model mới (nếu sau này Google ra mắt bản mới):
+            </Text>
+            <Input
+              value={reminderSettings.preferredAiModel}
+              onChangeText={(val) => updateReminderSettings({ preferredAiModel: val.trim() })}
+              placeholder="gemini-4-hydrogen"
+              autoCapitalize="none"
+              className="h-10 text-sm font-mono"
+            />
+          </View>
+        </Card>
+
+        {/* 5. Giới thiệu ứng dụng */}
         <Card className="p-4 border-border/60 bg-muted/40 mb-6">
           <View className="flex-row items-center">
             <ShieldCheck size={18} color="#0D9488" />

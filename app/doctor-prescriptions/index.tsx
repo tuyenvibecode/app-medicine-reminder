@@ -37,12 +37,15 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Haptics from 'expo-haptics';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '@/context/AppContext';
-import { supabase } from '@/lib/supabase';
+import {
+  AI_PRESCRIPTION_TEMPLATES,
+  analyzePrescriptionImageWithBackup,
+} from '@/services/aiPrescriptionService';
 import type { DoctorPrescription } from '@/types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -64,61 +67,21 @@ async function preserveHighResAndStripExif(uri: string): Promise<string> {
   }
 }
 
-// Các mẫu AI nhận diện nhanh theo nhóm bệnh phổ biến (dùng khi offline hoặc xác nhận nhanh)
-const AI_PRESCRIPTION_TEMPLATES = [
-  {
-    id: 'bp',
-    label: 'Huyết áp & Tim mạch',
-    conditionType: 'blood_pressure' as const,
-    title: 'Đơn thuốc Huyết áp & Tim mạch',
-    medicationsText: 'Amlodipine 5mg (Sáng 1v), Losartan 50mg (Tối 1v)',
-    systolic: '130',
-    diastolic: '85',
-    bloodSugar: '',
-    notes: `Uống thuốc đều đặn mỗi sáng sau ăn. Hạn chế ăn mặn. Tái khám ngày ${format(
-      addDays(new Date(), 30),
-      'dd/MM/yyyy'
-    )}.`,
-  },
-  {
-    id: 'diabetes',
-    label: 'Tiểu đường (Đường huyết)',
-    conditionType: 'diabetes' as const,
-    title: 'Đơn thuốc Tiểu đường (Đường huyết)',
-    medicationsText: 'Glucophage XR 500mg (Tối 1v sau ăn), Diamicron MR 30mg (Sáng 1v)',
-    systolic: '125',
-    diastolic: '80',
-    bloodSugar: '6.8',
-    notes: `Kiêng đồ ngọt, tinh bột trắng. Đo đường huyết lúc đói. Tái khám ngày ${format(
-      addDays(new Date(), 30),
-      'dd/MM/yyyy'
-    )}.`,
-  },
-  {
-    id: 'general',
-    label: 'Đơn khám tổng quát / Dạ dày',
-    conditionType: 'general' as const,
-    title: 'Đơn thuốc Khám nội tổng quát',
-    medicationsText: 'Esomeprazole 40mg (Trước ăn sáng 30p), Phosphalugel (Sau ăn)',
-    systolic: '',
-    diastolic: '',
-    bloodSugar: '',
-    notes: `Kiêng đồ chua cay, thức khuya. Tái khám sau 14 ngày (${format(
-      addDays(new Date(), 14),
-      'dd/MM/yyyy'
-    )}).`,
-  },
-];
-
 export default function DoctorPrescriptionsScreen() {
   const router = useRouter();
-  const { doctorPrescriptions, addDoctorPrescription, deleteDoctorPrescription } = useAppStore();
+  const {
+    doctorPrescriptions,
+    addDoctorPrescription,
+    deleteDoctorPrescription,
+    reminderSettings,
+  } = useAppStore();
 
   // Modal thêm đơn thuốc mới
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [isAiScanning, setIsAiScanning] = useState(false);
   const [aiScannedSuccess, setAiScannedSuccess] = useState(false);
+  const [usedAiModelLabel, setUsedAiModelLabel] = useState('');
 
   const [conditionType, setConditionType] = useState<'blood_pressure' | 'diabetes' | 'general'>(
     'blood_pressure'
@@ -153,50 +116,34 @@ export default function DoctorPrescriptionsScreen() {
   };
 
   /**
-   * AI tự động đọc ảnh toa thuốc và điền sẵn Tên loại bệnh, Danh sách thuốc, Ghi chú tái khám & Chỉ số.
-   * Tuân thủ Rule 01 & Rule 04: Gọi qua Supabase Edge Function `ocr-prescription` (nếu đã cấu hình),
-   * nếu đang chạy offline sẽ tự động trích xuất mẫu thông minh để người dùng xem và xác nhận trước khi lưu.
+   * AI tự động đọc ảnh toa thuốc qua chuỗi 4 tầng dự phòng (aiPrescriptionService):
+   * gemini-4-hydrogen -> gemini-3.5-flash-lite -> gemini-4-argon -> Offline Smart Fallback
    */
   const runAiAutoFillFromImage = async (uri: string, templateIdx = 0) => {
     setIsAiScanning(true);
     setAiScannedSuccess(false);
     try {
-      // Thử gọi Supabase Edge Function ocr-prescription nếu backend đã kết nối
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-      if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
-        const { data, error } = await supabase.functions.invoke('ocr-prescription', {
-          body: { imageUri: uri },
-        });
-        if (!error && data && data.title) {
-          setTitle(data.title);
-          setMedicationsText(data.medicationsText || '');
-          setNotes(data.notes || '');
-          if (data.systolic) setSystolic(String(data.systolic));
-          if (data.diastolic) setDiastolic(String(data.diastolic));
-          if (data.bloodSugar) setBloodSugar(String(data.bloodSugar));
-          setAiScannedSuccess(true);
-          setIsAiScanning(false);
-          return;
-        }
-      }
+      const result = await analyzePrescriptionImageWithBackup({
+        imageUri: uri,
+        preferredModel: reminderSettings.preferredAiModel,
+        fallbackIndex: templateIdx,
+      });
 
-      // Chế độ AI thông minh trên thiết bị (Offline / Demo)
-      await new Promise((r) => setTimeout(r, 900));
-      const tpl = AI_PRESCRIPTION_TEMPLATES[templateIdx % AI_PRESCRIPTION_TEMPLATES.length];
-      setConditionType(tpl.conditionType);
-      setTitle(tpl.title);
-      setMedicationsText(tpl.medicationsText);
-      setSystolic(tpl.systolic);
-      setDiastolic(tpl.diastolic);
-      setBloodSugar(tpl.bloodSugar);
-      setNotes(tpl.notes);
+      setConditionType(result.conditionType);
+      setTitle(result.title);
+      setMedicationsText(result.medicationsText);
+      setSystolic(result.systolic);
+      setDiastolic(result.diastolic);
+      setBloodSugar(result.bloodSugar);
+      setNotes(result.notes);
+      setUsedAiModelLabel(result.usedModel);
       setAiScannedSuccess(true);
 
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}
     } catch {
-      // Nếu lỗi mạng vẫn cho phép người dùng tự điền hoặc chọn mẫu nhanh
+      // Nếu lỗi vẫn cho phép tự điền hoặc chọn mẫu
     } finally {
       setIsAiScanning(false);
     }
@@ -853,8 +800,8 @@ export default function DoctorPrescriptionsScreen() {
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Sparkles size={15} color="#0D9488" />
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F766E', marginLeft: 6 }}>
-                      AI đã tự động điền thông tin! Bạn hãy kiểm tra lại trước khi lưu:
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F766E', marginLeft: 6, flex: 1 }}>
+                      AI đã tự động điền thông tin ({usedAiModelLabel || reminderSettings.preferredAiModel})! Hãy kiểm tra lại trước khi lưu:
                     </Text>
                   </View>
                 </View>

@@ -197,6 +197,7 @@ const INITIAL_REMINDER_SETTINGS: ReminderSettings = {
   ringtoneName: 'Chuông báo tiêu chuẩn (Rõ ràng)',
   highPriorityAlarm: true,
   hideDetailsOnLock: false,
+  preferredAiModel: 'gemini-4-hydrogen',
 };
 
 export interface AddMedicationInput {
