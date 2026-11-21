@@ -75,7 +75,7 @@ export default function AccountScreen() {
     <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-background">
       <ScrollView
         className="flex-1 px-4 pt-3"
-        contentContainerStyle={{ paddingBottom: 90 }}
+        contentContainerStyle={{ paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}

@@ -120,7 +120,7 @@ export default function MedicationsScreen() {
         {/* Danh sách thuốc */}
         <ScrollView
           className="flex-1"
-          contentContainerStyle={{ paddingBottom: 90 }}
+          contentContainerStyle={{ paddingBottom: 110 }}
           showsVerticalScrollIndicator={false}
         >
           {filtered.length === 0 ? (

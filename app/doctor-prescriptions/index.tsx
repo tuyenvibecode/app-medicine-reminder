@@ -3,7 +3,7 @@
 // Lưu ảnh chụp toa thuốc độ phân giải gốc (HD), AI tự động đọc ảnh điền tên thuốc/loại bệnh/ghi chú tái khám,
 // và theo dõi chỉ số Huyết áp / Đường huyết để tự động so sánh giữa các lần khám.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import {
   ArrowLeft,
@@ -69,6 +69,7 @@ async function preserveHighResAndStripExif(uri: string): Promise<string> {
 
 export default function DoctorPrescriptionsScreen() {
   const router = useRouter();
+  const { autoCapture } = useLocalSearchParams<{ autoCapture?: string }>();
   const {
     doctorPrescriptions,
     addDoctorPrescription,
@@ -257,6 +258,18 @@ export default function DoctorPrescriptionsScreen() {
   const cycleZoom = () => {
     setZoomScale((prev) => (prev === 1 ? 1.8 : prev === 1.8 ? 2.5 : 1));
   };
+
+  // Khi bấm nút Camera ở chính giữa thanh Bottom Bar -> Tự động mở Modal lưu đơn và bật Camera chụp ngay
+  useEffect(() => {
+    if (autoCapture === '1') {
+      openAddModal();
+      const timer = setTimeout(() => {
+        handleTakeHighResPhoto();
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCapture]);
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-background">
