@@ -91,13 +91,14 @@ export interface FamilyMember {
   inviteCode?: string;
 }
 
-// Kiểu dữ liệu thuốc trong kho tra cứu (từ Nhà thuốc An Khang chi_thuoc.json)
+// Kiểu dữ liệu thuốc trong kho tra cứu (từ kho data-medicine)
 export interface CatalogMedicine {
   name: string;
   brand?: string | null;
   dosage_form?: string | null;
   strength?: string | null;
   image?: string | null;
+  original_image?: string | null;
   short_usage?: string | null;
   url?: string | null;
   classification?: string | null; // "Thuốc không kê đơn" | "Thuốc kê đơn"
@@ -130,4 +131,27 @@ export interface Prescription {
   medicines: PrescriptionMedicineItem[];
   instructions?: string; // Dặn dò chung của dược sĩ
   status: 'active' | 'completed';
+}
+
+// Đơn thuốc giấy do Bác sĩ kê (lưu ảnh độ phân giải cao & ngày bắt đầu điều trị)
+export interface DoctorPrescription {
+  id: string;
+  title: string; // Ví dụ: "Đơn thuốc Huyết áp & Tim mạch"
+  doctorOrHospital?: string; // Ví dụ: "BV Đại học Y Dược"
+  startDate: string; // Ngày bắt đầu khởi tạo đơn thuốc (ví dụ: "21/11/2026")
+  imageUri: string; // Ảnh chụp sắc nét độ phân giải gốc
+  notes?: string;
+  createdAt: string;
+}
+
+// Cấu hình khung giờ nhắc mặc định & nhạc chuông
+export interface ReminderSettings {
+  morningTime: string; // "07:30"
+  noonTime: string; // "12:00"
+  afternoonTime: string; // "17:30"
+  eveningTime: string; // "21:00"
+  ringtoneId: 'default' | 'gentle' | 'loud_alarm' | 'vibrate_only';
+  ringtoneName: string;
+  highPriorityAlarm: boolean;
+  hideDetailsOnLock: boolean;
 }

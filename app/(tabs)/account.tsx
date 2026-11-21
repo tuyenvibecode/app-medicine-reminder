@@ -1,5 +1,5 @@
 // app/(tabs)/account.tsx
-// Màn hình "Tài khoản" & Trung tâm Quản trị Gia đình
+// Màn hình "Tài khoản", Lưu trữ Đơn thuốc Bác sĩ & Trung tâm Quản trị Gia đình
 
 import React, { useState } from 'react';
 import {
@@ -21,15 +21,19 @@ import {
   QrCode,
   Lock,
   Settings,
+  FileText,
+  BellRing,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { useAppStore } from '@/context/AppContext';
 
 export default function AccountScreen() {
   const router = useRouter();
+  const { doctorPrescriptions, reminderSettings } = useAppStore();
 
   // Trạng thái mô phỏng: Đã đăng nhập với tư cách Chủ gia đình / Admin
   const [isLoggedIn, setIsLoggedIn] = useState(true);
@@ -113,16 +117,57 @@ export default function AccountScreen() {
               </View>
             </Card>
 
-            {/* 2. MỤC NỔI BẬT: TRANG QUẢN TRỊ THÀNH VIÊN GIA ĐÌNH */}
+            {/* 2. HỒ SƠ ĐƠN THUỐC BÁC SĨ KÊ (Lưu ảnh gốc sắc nét & ngày bắt đầu) */}
+            <Text className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 ml-1">
+              Hồ sơ Y tế & Đơn thuốc
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.push('/doctor-prescriptions' as any)}
+              activeOpacity={0.75}
+              className="mb-5"
+            >
+              <Card className="p-4 border-primary/30 bg-card">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center flex-1 mr-2">
+                    <View className="h-12 w-12 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center">
+                      <FileText size={22} color="#0D9488" strokeWidth={2} />
+                    </View>
+                    <View className="ml-3 flex-1">
+                      <View className="flex-row items-center flex-wrap gap-1.5">
+                        <Text className="text-base font-bold text-foreground">
+                          Đơn thuốc của Bác sĩ
+                        </Text>
+                        <Badge
+                          variant="default"
+                          label={
+                            doctorPrescriptions.length > 0
+                              ? `${doctorPrescriptions.length} đơn đã lưu`
+                              : 'Ảnh HD sắc nét'
+                          }
+                        />
+                      </View>
+                      <Text className="text-xs text-muted-foreground mt-1" numberOfLines={2}>
+                        Chụp & lưu ảnh gốc đơn thuốc bác sĩ kê kèm ngày bắt đầu điều trị
+                      </Text>
+                    </View>
+                  </View>
+                  <View className="w-6 items-end justify-center">
+                    <ChevronRight size={20} color="#0D9488" />
+                  </View>
+                </View>
+              </Card>
+            </TouchableOpacity>
+
+            {/* 3. TRUNG TÂM QUẢN TRỊ GIA ĐÌNH */}
             <Text className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 ml-1">
               Trung tâm Quản trị
             </Text>
             <TouchableOpacity
               onPress={() => router.push('/admin' as any)}
-              activeOpacity={0.7}
+              activeOpacity={0.75}
               className="mb-5"
             >
-              <Card className="p-4 border-primary/30 bg-card">
+              <Card className="p-4 border-border/80 bg-card">
                 <View className="flex-row items-center justify-between">
                   <View className="flex-row items-center flex-1 mr-2">
                     <View className="h-12 w-12 rounded-2xl bg-primary/10 border border-primary/20 items-center justify-center">
@@ -147,20 +192,39 @@ export default function AccountScreen() {
               </Card>
             </TouchableOpacity>
 
-            {/* 3. Tiện ích & Bảo mật tài khoản */}
+            {/* 4. BẢO MẬT & CẤU HÌNH (Nhạc chuông, giờ nhắc thuốc, vân tay) */}
             <Text className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 ml-1">
               Bảo mật & Cấu hình
             </Text>
             <Card className="mb-5 p-4 border-border/80">
-              {/* Đổi mật khẩu */}
+              {/* Cấu hình thời gian nhắc nhở & Nhạc chuông báo */}
               <TouchableOpacity
                 className="flex-row items-center justify-between py-3 border-b border-border/50"
-                onPress={() => Alert.alert('Đổi mật khẩu', 'Tính năng cho phép đổi mật khẩu tài khoản.')}
+                onPress={() => router.push('/settings' as any)}
               >
                 <View className="flex-row items-center flex-1 mr-2">
-                  <KeyRound size={18} color="#64748B" />
+                  <BellRing size={19} color="#0D9488" />
+                  <View className="ml-3 flex-1">
+                    <Text className="text-base font-semibold text-foreground">
+                      Cấu hình giờ nhắc & Nhạc chuông
+                    </Text>
+                    <Text className="text-xs text-muted-foreground mt-0.5" numberOfLines={1}>
+                      {reminderSettings.ringtoneName} • Sáng {reminderSettings.morningTime}
+                    </Text>
+                  </View>
+                </View>
+                <ChevronRight size={18} color="#0D9488" />
+              </TouchableOpacity>
+
+              {/* Cài đặt ứng dụng & Khoá vân tay */}
+              <TouchableOpacity
+                className="flex-row items-center justify-between py-3 border-b border-border/50"
+                onPress={() => router.push('/settings' as any)}
+              >
+                <View className="flex-row items-center flex-1 mr-2">
+                  <Settings size={18} color="#0D9488" />
                   <Text className="text-base font-medium text-foreground ml-3">
-                    Đổi mật khẩu tài khoản
+                    Cài đặt bảo vệ & Vân tay
                   </Text>
                 </View>
                 <ChevronRight size={18} color="#94A3B8" />
@@ -180,22 +244,22 @@ export default function AccountScreen() {
                 <Badge variant="outline" label="4 thành viên" />
               </TouchableOpacity>
 
-              {/* Cài đặt ứng dụng & Khoá vân tay */}
+              {/* Đổi mật khẩu */}
               <TouchableOpacity
                 className="flex-row items-center justify-between py-3 border-b border-border/50"
-                onPress={() => router.push('/settings' as any)}
+                onPress={() => Alert.alert('Đổi mật khẩu', 'Tính năng cho phép đổi mật khẩu tài khoản.')}
               >
                 <View className="flex-row items-center flex-1 mr-2">
-                  <Settings size={18} color="#0D9488" />
+                  <KeyRound size={18} color="#64748B" />
                   <Text className="text-base font-medium text-foreground ml-3">
-                    Cài đặt bảo vệ & Vân tay
+                    Đổi mật khẩu tài khoản
                   </Text>
                 </View>
                 <ChevronRight size={18} color="#94A3B8" />
               </TouchableOpacity>
 
               {/* Bảo mật RLS */}
-              <View className="flex-row items-center py-2">
+              <View className="flex-row items-center pt-3 pb-1">
                 <Shield size={18} color="#0D9488" />
                 <Text className="text-xs text-muted-foreground ml-3 flex-1">
                   Dữ liệu được bảo vệ bằng Row Level Security (RLS) của Supabase.

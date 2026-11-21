@@ -1,6 +1,6 @@
 // src/context/AppContext.tsx
-// Quản lý trạng thái trung tâm của ứng dụng: Tủ thuốc, Lịch nhắc hôm nay, Lịch sử uống và Đồng bộ đơn thuốc
-// Đảm bảo dữ liệu giữa các tab luôn đồng bộ tức thì và đặt thông báo local chính xác.
+// Quản lý trạng thái trung tâm của ứng dụng: Tủ thuốc, Lịch nhắc hôm nay, Lịch sử uống,
+// Đơn thuốc bác sĩ kê (ảnh sắc nét) và Cấu hình giờ nhắc & Nhạc chuông.
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -12,6 +12,8 @@ import type {
   PrescriptionMedicineItem,
   TimeOfDayGroup,
   TreatmentType,
+  DoctorPrescription,
+  ReminderSettings,
 } from '@/types';
 
 const INITIAL_MEDICATIONS: Medication[] = [
@@ -186,6 +188,17 @@ const INITIAL_HISTORY_LOGS: HistoryLogItem[] = [
   },
 ];
 
+const INITIAL_REMINDER_SETTINGS: ReminderSettings = {
+  morningTime: '07:30',
+  noonTime: '12:00',
+  afternoonTime: '18:00',
+  eveningTime: '21:00',
+  ringtoneId: 'default',
+  ringtoneName: 'Chuông báo tiêu chuẩn (Rõ ràng)',
+  highPriorityAlarm: true,
+  hideDetailsOnLock: false,
+};
+
 export interface AddMedicationInput {
   name: string;
   dosage: string;
@@ -196,19 +209,24 @@ export interface AddMedicationInput {
   totalCourseStock?: number;
   stock: number;
   lowStockThreshold: number;
-  selectedTimes: string[]; // Ví dụ: ['07:30 (Sáng)', '21:00 (Tối)']
+  selectedTimes: string[]; // Ví dụ: ['07:30 (Sáng)', '15:30', '21:00 (Tối)']
 }
 
 interface AppContextValue {
   medications: Medication[];
   doses: DoseTimelineItem[];
   historyLogs: HistoryLogItem[];
+  doctorPrescriptions: DoctorPrescription[];
+  reminderSettings: ReminderSettings;
   takeDose: (item: DoseTimelineItem) => void;
   undoTakeDose: (item: DoseTimelineItem) => void;
   snoozeDose: (item: DoseTimelineItem) => void;
   refillMedication: (medicationId: string, addCount: number) => void;
   addMedication: (input: AddMedicationInput) => void;
   syncPrescriptionToReminders: (items: PrescriptionMedicineItem[]) => void;
+  addDoctorPrescription: (item: Omit<DoctorPrescription, 'id' | 'createdAt'>) => void;
+  deleteDoctorPrescription: (id: string) => void;
+  updateReminderSettings: (patch: Partial<ReminderSettings>) => void;
 }
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -216,7 +234,7 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 /**
  * Xác định nhóm buổi trong ngày dựa vào chuỗi giờ "HH:mm"
  */
-function getTimeGroupFromTime(timeStr: string): TimeOfDayGroup {
+export function getTimeGroupFromTime(timeStr: string): TimeOfDayGroup {
   const hour = parseInt(timeStr.split(':')[0] || '8', 10);
   if (hour < 11) return 'morning';
   if (hour < 14) return 'noon';
@@ -228,6 +246,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [medications, setMedications] = useState<Medication[]>(INITIAL_MEDICATIONS);
   const [doses, setDoses] = useState<DoseTimelineItem[]>(INITIAL_DOSES);
   const [historyLogs, setHistoryLogs] = useState<HistoryLogItem[]>(INITIAL_HISTORY_LOGS);
+  const [doctorPrescriptions, setDoctorPrescriptions] = useState<DoctorPrescription[]>([]);
+  const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(
+    INITIAL_REMINDER_SETTINGS
+  );
 
   // Đánh dấu đã uống thuốc: trừ tồn kho 1 viên và ghi nhận vào lịch sử
   const takeDose = useCallback((item: DoseTimelineItem) => {
@@ -368,13 +390,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setMedications((prev) => [newMed, ...prev]);
 
-    const timesToSchedule = input.selectedTimes.length > 0 ? input.selectedTimes : ['08:00 (Sáng)'];
+    const timesToSchedule = input.selectedTimes.length > 0 ? input.selectedTimes : ['07:30'];
     const newDoses: DoseTimelineItem[] = timesToSchedule.map((rawTime, idx) => {
       // Tách phần "07:30" từ "07:30 (Sáng)"
-      const clockTime = rawTime.split(' ')[0] || '08:00';
+      const clockTime = rawTime.split(' ')[0] || '07:30';
       const [hStr, mStr] = clockTime.split(':');
-      const hour = parseInt(hStr || '8', 10);
-      const minute = parseInt(mStr || '0', 10);
+      const hour = parseInt(hStr || '7', 10);
+      const minute = parseInt(mStr || '30', 10);
 
       scheduleDailyReminder(newMed.name, cleanDosage, hour, minute).catch(() => {});
 
@@ -401,77 +423,105 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Đồng bộ toàn bộ thuốc từ Phiếu đơn thuốc vào Tủ thuốc và Lịch nhắc hôm nay
-  const syncPrescriptionToReminders = useCallback((items: PrescriptionMedicineItem[]) => {
-    if (items.length === 0) return;
+  const syncPrescriptionToReminders = useCallback(
+    (items: PrescriptionMedicineItem[]) => {
+      if (items.length === 0) return;
 
-    const nowIso = new Date().toISOString();
-    const addedMeds: Medication[] = [];
-    const addedDoses: DoseTimelineItem[] = [];
+      const nowIso = new Date().toISOString();
+      const addedMeds: Medication[] = [];
+      const addedDoses: DoseTimelineItem[] = [];
 
-    items.forEach((item, index) => {
-      const medId = `rx-med-${Date.now()}-${index}`;
-      const med: Medication = {
-        id: medId,
-        user_id: 'u1',
-        name: item.name,
-        dosage: item.dosageInstruction,
-        notes: item.notes || `Đơn thuốc gia đình (${item.durationDays || 5} ngày)`,
-        image: item.image || null,
-        treatment_type: 'course',
-        course_duration_months: 1,
-        total_course_stock: item.quantity,
-        stock: item.quantity,
-        low_stock_threshold: Math.min(3, Math.max(1, Math.floor(item.quantity * 0.2))),
-        is_active: true,
-        created_at: nowIso,
-        updated_at: nowIso,
-      };
-      addedMeds.push(med);
-
-      // Phân tích khung giờ tự động từ hướng dẫn liều dùng
-      const instrLower = item.dosageInstruction.toLowerCase();
-      let times: string[] = ['08:00'];
-      if (instrLower.includes('3 lần')) {
-        times = ['07:30', '12:30', '19:30'];
-      } else if (instrLower.includes('2 lần')) {
-        times = ['08:00', '20:00'];
-      } else if (instrLower.includes('trước khi ngủ') || instrLower.includes('tối')) {
-        times = ['21:00'];
-      } else if (instrLower.includes('trưa')) {
-        times = ['12:30'];
-      } else if (instrLower.includes('chiều')) {
-        times = ['17:30'];
-      }
-
-      times.forEach((clockTime, tIdx) => {
-        const [hStr, mStr] = clockTime.split(':');
-        scheduleDailyReminder(
-          item.name,
-          item.dosageInstruction,
-          parseInt(hStr || '8', 10),
-          parseInt(mStr || '0', 10)
-        ).catch(() => {});
-
-        addedDoses.push({
-          id: `rx-dose-${Date.now()}-${index}-${tIdx}`,
-          scheduleId: `rx-sched-${Date.now()}-${index}-${tIdx}`,
-          medicationId: medId,
-          medicationName: item.name,
+      items.forEach((item, index) => {
+        const medId = `rx-med-${Date.now()}-${index}`;
+        const med: Medication = {
+          id: medId,
+          user_id: 'u1',
+          name: item.name,
           dosage: item.dosageInstruction,
-          scheduledTime: clockTime,
-          timeGroup: getTimeGroupFromTime(clockTime),
-          status: 'upcoming',
+          notes: item.notes || `Đơn thuốc gia đình (${item.durationDays || 5} ngày)`,
           image: item.image || null,
+          treatment_type: 'course',
+          course_duration_months: 1,
+          total_course_stock: item.quantity,
           stock: item.quantity,
-          totalCourseStock: item.quantity,
-          treatmentType: 'course',
-          lowStockThreshold: med.low_stock_threshold ?? 3,
+          low_stock_threshold: Math.min(3, Math.max(1, Math.floor(item.quantity * 0.2))),
+          is_active: true,
+          created_at: nowIso,
+          updated_at: nowIso,
+        };
+        addedMeds.push(med);
+
+        // Phân tích khung giờ tự động từ hướng dẫn liều dùng theo cấu hình giờ gia đình
+        const instrLower = item.dosageInstruction.toLowerCase();
+        let times: string[] = [reminderSettings.morningTime];
+        if (instrLower.includes('3 lần')) {
+          times = [
+            reminderSettings.morningTime,
+            reminderSettings.noonTime,
+            reminderSettings.eveningTime,
+          ];
+        } else if (instrLower.includes('2 lần')) {
+          times = [reminderSettings.morningTime, reminderSettings.eveningTime];
+        } else if (instrLower.includes('trước khi ngủ') || instrLower.includes('tối')) {
+          times = [reminderSettings.eveningTime];
+        } else if (instrLower.includes('trưa')) {
+          times = [reminderSettings.noonTime];
+        } else if (instrLower.includes('chiều')) {
+          times = [reminderSettings.afternoonTime];
+        }
+
+        times.forEach((clockTime, tIdx) => {
+          const [hStr, mStr] = clockTime.split(':');
+          scheduleDailyReminder(
+            item.name,
+            item.dosageInstruction,
+            parseInt(hStr || '8', 10),
+            parseInt(mStr || '0', 10)
+          ).catch(() => {});
+
+          addedDoses.push({
+            id: `rx-dose-${Date.now()}-${index}-${tIdx}`,
+            scheduleId: `rx-sched-${Date.now()}-${index}-${tIdx}`,
+            medicationId: medId,
+            medicationName: item.name,
+            dosage: item.dosageInstruction,
+            scheduledTime: clockTime,
+            timeGroup: getTimeGroupFromTime(clockTime),
+            status: 'upcoming',
+            image: item.image || null,
+            stock: item.quantity,
+            totalCourseStock: item.quantity,
+            treatmentType: 'course',
+            lowStockThreshold: med.low_stock_threshold ?? 3,
+          });
         });
       });
-    });
 
-    setMedications((prev) => [...addedMeds, ...prev]);
-    setDoses((prev) => [...prev, ...addedDoses]);
+      setMedications((prev) => [...addedMeds, ...prev]);
+      setDoses((prev) => [...prev, ...addedDoses]);
+    },
+    [reminderSettings]
+  );
+
+  // Thêm đơn thuốc giấy của bác sĩ (lưu ảnh độ phân giải cao sắc nét)
+  const addDoctorPrescription = useCallback(
+    (item: Omit<DoctorPrescription, 'id' | 'createdAt'>) => {
+      const newDoc: DoctorPrescription = {
+        ...item,
+        id: `doc-rx-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+      };
+      setDoctorPrescriptions((prev) => [newDoc, ...prev]);
+    },
+    []
+  );
+
+  const deleteDoctorPrescription = useCallback((id: string) => {
+    setDoctorPrescriptions((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  const updateReminderSettings = useCallback((patch: Partial<ReminderSettings>) => {
+    setReminderSettings((prev) => ({ ...prev, ...patch }));
   }, []);
 
   return (
@@ -480,12 +530,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         medications,
         doses,
         historyLogs,
+        doctorPrescriptions,
+        reminderSettings,
         takeDose,
         undoTakeDose,
         snoozeDose,
         refillMedication,
         addMedication,
         syncPrescriptionToReminders,
+        addDoctorPrescription,
+        deleteDoctorPrescription,
+        updateReminderSettings,
       }}
     >
       {children}

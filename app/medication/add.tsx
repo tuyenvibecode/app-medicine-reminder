@@ -1,13 +1,16 @@
 // app/medication/add.tsx
 // Màn hình Thêm thuốc mới vào tủ thuốc & đặt lịch nhắc
-// Hỗ trợ liệu trình điều trị dài hạn & quản lý số lượng mua theo đợt linh hoạt
+// Tích hợp: Tìm nhanh từ kho 2.000+ thuốc (có sẵn ảnh), hoặc tự chụp/chọn từ Album,
+// và chọn Khung giờ uống thuốc linh hoạt (4 khung giờ nhanh + Thêm giờ tuỳ chỉnh bất kỳ).
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
+  TextInput,
+  Modal,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +26,8 @@ import {
   Calendar,
   AlertCircle,
   ShoppingBag,
+  Search,
+  Plus,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -32,9 +37,9 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAppStore } from '@/context/AppContext';
-import type { TreatmentType } from '@/types';
+import { searchMedicines } from '@/services/medicineService';
+import type { TreatmentType, CatalogMedicine } from '@/types';
 
-const QUICK_TIMES = ['07:30 (Sáng)', '12:00 (Trưa)', '18:30 (Chiều)', '21:00 (Tối)'];
 const COURSE_DURATIONS = [
   { label: '1 tháng', months: 1, days: 30 },
   { label: '2 tháng', months: 2, days: 60 },
@@ -50,7 +55,7 @@ async function sanitizeAndCompressImage(uri: string): Promise<string> {
     const result = await ImageManipulator.manipulateAsync(
       uri,
       [{ resize: { width: 800 } }],
-      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+      { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
     );
     return result.uri;
   } catch {
@@ -58,9 +63,23 @@ async function sanitizeAndCompressImage(uri: string): Promise<string> {
   }
 }
 
+function getPeriodLabel(hour: number): string {
+  if (hour < 11) return 'Sáng';
+  if (hour < 14) return 'Trưa';
+  if (hour < 18) return 'Chiều';
+  return 'Tối';
+}
+
 export default function AddMedicationScreen() {
   const router = useRouter();
-  const { addMedication } = useAppStore();
+  const { addMedication, reminderSettings } = useAppStore();
+
+  // Tìm nhanh từ kho dữ liệu 2.000+ thuốc
+  const [catalogQuery, setCatalogQuery] = useState('');
+  const catalogSuggestions = useMemo(() => {
+    if (!catalogQuery.trim()) return [];
+    return searchMedicines(catalogQuery, { limit: 6 });
+  }, [catalogQuery]);
 
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -74,7 +93,53 @@ export default function AddMedicationScreen() {
   const [purchasedStock, setPurchasedStock] = useState<string>('30');
   const [lowStockThreshold, setLowStockThreshold] = useState<string>('5');
 
-  const [selectedTimes, setSelectedTimes] = useState<string[]>(['07:30 (Sáng)']);
+  // Danh sách các khung giờ gợi ý nhanh (kết hợp từ cấu hình gia đình + các giờ tuỳ chỉnh người dùng thêm)
+  const defaultPresetTimes = useMemo(
+    () => [
+      `${reminderSettings.morningTime} (Sáng)`,
+      `${reminderSettings.noonTime} (Trưa)`,
+      `${reminderSettings.afternoonTime} (Chiều)`,
+      `${reminderSettings.eveningTime} (Tối)`,
+    ],
+    [reminderSettings]
+  );
+
+  const [customTimeOptions, setCustomTimeOptions] = useState<string[]>([]);
+  const [selectedTimes, setSelectedTimes] = useState<string[]>(() => [
+    `${reminderSettings.morningTime} (Sáng)`,
+  ]);
+
+  // Modal thêm giờ uống thuốc tuỳ chỉnh tự do
+  const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [customHour, setCustomHour] = useState(8);
+  const [customMinute, setCustomMinute] = useState(30);
+
+  const allTimeOptions = useMemo(() => {
+    const merged = [...defaultPresetTimes];
+    customTimeOptions.forEach((t) => {
+      if (!merged.includes(t)) merged.push(t);
+    });
+    return merged;
+  }, [defaultPresetTimes, customTimeOptions]);
+
+  // Chọn 1 thuốc từ kho dữ liệu 2.000+ thuốc -> Tự điền tên, ảnh và gợi ý liều
+  const handleSelectCatalogMedicine = (med: CatalogMedicine) => {
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+    setName(med.name);
+    if (med.image) {
+      setPhotoUri(med.image);
+    }
+    if (!dosage.trim()) {
+      const form = med.dosage_form || '1 viên';
+      setDosage(`${form} - Sau bữa ăn`);
+    }
+    if (med.short_usage && !notes.trim()) {
+      setNotes(med.short_usage);
+    }
+    setCatalogQuery('');
+  };
 
   // Chọn ảnh từ thư viện
   const handlePickImage = async () => {
@@ -83,7 +148,7 @@ export default function AddMedicationScreen() {
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.85,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -107,7 +172,7 @@ export default function AddMedicationScreen() {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.85,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -131,6 +196,21 @@ export default function AddMedicationScreen() {
     }
   };
 
+  const handleAddCustomTime = () => {
+    const timeStr = `${String(customHour).padStart(2, '0')}:${String(customMinute).padStart(
+      2,
+      '0'
+    )} (${getPeriodLabel(customHour)})`;
+
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+
+    setCustomTimeOptions((prev) => (prev.includes(timeStr) ? prev : [...prev, timeStr]));
+    setSelectedTimes((prev) => (prev.includes(timeStr) ? prev : [...prev, timeStr]));
+    setTimePickerVisible(false);
+  };
+
   const selectDuration = (months: number, days: number) => {
     try {
       Haptics.selectionAsync();
@@ -147,7 +227,7 @@ export default function AddMedicationScreen() {
 
   const handleSave = () => {
     if (!name.trim()) {
-      Alert.alert('Chưa đủ thông tin', 'Vui lòng nhập tên thuốc.');
+      Alert.alert('Chưa đủ thông tin', 'Vui lòng nhập tên thuốc hoặc chọn từ kho thuốc.');
       return;
     }
 
@@ -202,8 +282,81 @@ export default function AddMedicationScreen() {
         className="flex-1 px-4 pt-4"
         contentContainerStyle={{ paddingBottom: 60 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        {/* 1. Khu vực chụp ảnh viên thuốc (Hero visual) */}
+        {/* 0. TÌM NHANH TỪ KHO 2.000+ THUỐC ĐỂ TỰ ĐỘNG ĐIỀN TÊN & ẢNH */}
+        <Card className="mb-5 p-4 border-primary/30 bg-card">
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-sm font-bold text-foreground">
+              Tìm nhanh từ kho 2,000+ thuốc (Có sẵn ảnh)
+            </Text>
+            <Badge variant="default" label="Tự điền" />
+          </View>
+          <View className="flex-row items-center bg-muted/50 border border-border rounded-2xl px-3.5 h-11">
+            <Search size={17} color="#0D9488" />
+            <TextInput
+              value={catalogQuery}
+              onChangeText={setCatalogQuery}
+              placeholder="Gõ tên thuốc để lấy ảnh & thông tin (vd: Panadol, Oxy...)"
+              placeholderTextColor="#94A3B8"
+              className="flex-1 ml-2 text-sm text-foreground"
+            />
+            {catalogQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setCatalogQuery('')}>
+                <X size={16} color="#94A3B8" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Danh sách gợi ý từ kho thuốc */}
+          {catalogSuggestions.length > 0 && (
+            <View className="mt-3 pt-2 border-t border-border/50">
+              {catalogSuggestions.map((med, idx) => (
+                <TouchableOpacity
+                  key={`${med.name}-${idx}`}
+                  activeOpacity={0.75}
+                  onPress={() => handleSelectCatalogMedicine(med)}
+                  className="flex-row items-center justify-between py-2 border-b border-border/30"
+                >
+                  <View className="flex-row items-center flex-1 mr-2">
+                    {med.image ? (
+                      <Image
+                        source={{ uri: med.image }}
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 10,
+                          backgroundColor: '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                        }}
+                        contentFit="contain"
+                      />
+                    ) : (
+                      <View className="h-11 w-11 rounded-xl bg-primary/10 items-center justify-center">
+                        <Pill size={18} color="#0D9488" />
+                      </View>
+                    )}
+                    <View className="ml-2.5 flex-1">
+                      <Text className="text-xs font-bold text-foreground" numberOfLines={2}>
+                        {med.name}
+                      </Text>
+                      <Text className="text-[11px] text-muted-foreground" numberOfLines={1}>
+                        {med.dosage_form || 'Thuốc'} {med.brand ? `• ${med.brand}` : ''}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="bg-primary/10 px-2.5 py-1 rounded-lg">
+                    <Text className="text-xs font-bold text-primary">Chọn</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </Card>
+
+        {/* 1. Khu vực chụp ảnh viên thuốc hoặc lấy từ Album (nếu không có trong kho) */}
         <Card className="mb-5 p-4 border-dashed border-2 border-border/80 items-center justify-center">
           {photoUri ? (
             <View className="items-center">
@@ -216,12 +369,16 @@ export default function AddMedicationScreen() {
                   marginBottom: 12,
                   borderWidth: 1,
                   borderColor: '#E2E8F0',
+                  backgroundColor: '#FFFFFF',
                 }}
-                contentFit="cover"
+                contentFit="contain"
               />
               <View className="flex-row gap-2">
+                <Button variant="outline" size="sm" onPress={handleTakePhoto}>
+                  <Text className="text-xs text-foreground">Chụp ảnh khác</Text>
+                </Button>
                 <Button variant="outline" size="sm" onPress={handlePickImage}>
-                  <Text className="text-xs text-foreground">Đổi ảnh</Text>
+                  <Text className="text-xs text-foreground">Chọn từ Album</Text>
                 </Button>
                 <Button variant="ghost" size="sm" onPress={() => setPhotoUri(null)}>
                   <Text className="text-xs text-destructive">Xoá</Text>
@@ -229,15 +386,15 @@ export default function AddMedicationScreen() {
               </View>
             </View>
           ) : (
-            <View className="items-center py-4">
-              <View className="h-16 w-16 rounded-full bg-primary/10 items-center justify-center mb-3">
-                <Pill size={32} color="#0D9488" strokeWidth={1.8} />
+            <View className="items-center py-3">
+              <View className="h-14 w-14 rounded-full bg-primary/10 items-center justify-center mb-2.5">
+                <Pill size={28} color="#0D9488" strokeWidth={1.8} />
               </View>
               <Text className="text-base font-semibold text-foreground">
-                Ảnh viên thuốc
+                Ảnh viên thuốc / Hộp thuốc
               </Text>
               <Text className="text-xs text-muted-foreground mt-0.5 text-center px-4">
-                Chụp ảnh rõ viên thuốc để nhận diện dễ dàng lúc chuông reo
+                Nếu thuốc không có trong kho tìm kiếm ở trên, bạn có thể tự chụp hoặc lấy từ Album
               </Text>
 
               <View className="flex-row gap-3 mt-4">
@@ -261,7 +418,7 @@ export default function AddMedicationScreen() {
                 >
                   <ImageIcon size={16} color="#0D9488" />
                   <Text className="text-xs font-semibold text-foreground ml-1.5">
-                    Chọn từ máy
+                    Chọn từ Album
                   </Text>
                 </Button>
               </View>
@@ -315,7 +472,7 @@ export default function AddMedicationScreen() {
             <TouchableOpacity
               onPress={() => setTreatmentType('course')}
               className={`flex-1 py-2.5 rounded-xl items-center ${
-                treatmentType === 'course' ? 'bg-card shadow-sm' : ''
+                treatmentType === 'course' ? 'bg-card' : ''
               }`}
             >
               <Text
@@ -330,7 +487,7 @@ export default function AddMedicationScreen() {
             <TouchableOpacity
               onPress={() => setTreatmentType('ongoing')}
               className={`flex-1 py-2.5 rounded-xl items-center ${
-                treatmentType === 'ongoing' ? 'bg-card shadow-sm' : ''
+                treatmentType === 'ongoing' ? 'bg-card' : ''
               }`}
             >
               <Text
@@ -460,41 +617,89 @@ export default function AddMedicationScreen() {
           )}
         </Card>
 
-        {/* 5. Lịch uống trong ngày */}
+        {/* 5. KHUNG GIỜ UỐNG THUỐC LINH HOẠT (Gợi ý nhanh + Chọn giờ tuỳ chỉnh thoải mái) */}
         <Card className="mb-6 p-4 border-border/80">
-          <View className="flex-row items-center mb-2.5">
-            <Clock size={18} color="#0D9488" />
-            <Text className="text-base font-semibold text-foreground ml-2">
-              Khung giờ uống thuốc
-            </Text>
+          <View className="flex-row items-center justify-between mb-2">
+            <View className="flex-row items-center">
+              <Clock size={18} color="#0D9488" />
+              <Text className="text-base font-semibold text-foreground ml-2">
+                Khung giờ uống thuốc
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setTimePickerVisible(true)}
+              className="flex-row items-center bg-primary/10 px-2.5 py-1 rounded-full"
+            >
+              <Plus size={13} color="#0D9488" strokeWidth={2.5} />
+              <Text className="text-xs font-bold text-primary ml-1">Thêm giờ khác</Text>
+            </TouchableOpacity>
           </View>
 
-          <View className="flex-row flex-wrap gap-2 mt-1">
-            {QUICK_TIMES.map((time) => {
+          <Text className="text-xs text-muted-foreground mb-3">
+            Chọn nhanh khung giờ gợi ý hoặc bấm &ldquo;+ Thêm giờ khác&rdquo; để đặt giờ bất kỳ:
+          </Text>
+
+          <View className="flex-row flex-wrap gap-2">
+            {allTimeOptions.map((time) => {
               const isSelected = selectedTimes.includes(time);
               return (
                 <TouchableOpacity
                   key={time}
                   onPress={() => toggleTime(time)}
-                  className={`px-3.5 py-2.5 rounded-xl border flex-row items-center ${
-                    isSelected
-                      ? 'bg-primary border-primary'
-                      : 'bg-card border-border'
-                  }`}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: isSelected ? '#0D9488' : '#FFFFFF',
+                    borderColor: isSelected ? '#0D9488' : '#E2E8F0',
+                  }}
                 >
                   {isSelected && (
-                    <Check size={14} color="#FFFFFF" strokeWidth={2.5} className="mr-1" />
+                    <Check size={14} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 5 }} />
                   )}
                   <Text
-                    className={`text-sm font-medium ${
-                      isSelected ? 'text-white font-semibold' : 'text-foreground'
-                    }`}
+                    style={{
+                      fontSize: 13,
+                      fontWeight: isSelected ? '700' : '500',
+                      color: isSelected ? '#FFFFFF' : '#0F172A',
+                    }}
                   >
                     {time}
                   </Text>
                 </TouchableOpacity>
               );
             })}
+
+            {/* Nút thêm giờ tuỳ chỉnh trực tiếp */}
+            <TouchableOpacity
+              onPress={() => setTimePickerVisible(true)}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderStyle: 'dashed',
+                borderColor: '#0D9488',
+                backgroundColor: 'rgba(13, 148, 136, 0.05)',
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <Plus size={14} color="#0D9488" strokeWidth={2.5} />
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: '#0D9488',
+                  marginLeft: 4,
+                }}
+              >
+                Chọn giờ tuỳ ý
+              </Text>
+            </TouchableOpacity>
           </View>
         </Card>
 
@@ -510,6 +715,124 @@ export default function AddMedicationScreen() {
           </Text>
         </Button>
       </ScrollView>
+
+      {/* MODAL CHỌN GIỜ UỐNG THUỐC TUỲ CHỈNH TỰ DO */}
+      <Modal
+        visible={timePickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTimePickerVisible(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-center items-center px-5">
+          <Card className="w-full max-w-sm p-5 border-border bg-card">
+            <View className="flex-row items-center justify-between pb-3 border-b border-border/50">
+              <Text className="text-base font-bold text-foreground">
+                Thêm khung giờ uống thuốc
+              </Text>
+              <TouchableOpacity
+                onPress={() => setTimePickerVisible(false)}
+                className="h-8 w-8 rounded-full bg-muted/60 items-center justify-center"
+              >
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View className="flex-row items-center justify-center my-6 gap-4">
+              {/* Cột Giờ */}
+              <View className="items-center">
+                <TouchableOpacity
+                  onPress={() => setCustomHour((h) => (h + 1) % 24)}
+                  className="h-10 w-16 rounded-xl bg-muted/70 items-center justify-center mb-2"
+                >
+                  <Text className="text-lg font-bold text-foreground">+</Text>
+                </TouchableOpacity>
+                <View className="h-16 w-20 rounded-2xl bg-primary/10 border border-primary/30 items-center justify-center">
+                  <Text className="text-3xl font-extrabold text-primary">
+                    {String(customHour).padStart(2, '0')}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setCustomHour((h) => (h - 1 + 24) % 24)}
+                  className="h-10 w-16 rounded-xl bg-muted/70 items-center justify-center mt-2"
+                >
+                  <Text className="text-lg font-bold text-foreground">-</Text>
+                </TouchableOpacity>
+                <Text className="text-xs text-muted-foreground mt-1">Giờ</Text>
+              </View>
+
+              <Text className="text-3xl font-extrabold text-foreground pb-5">:</Text>
+
+              {/* Cột Phút */}
+              <View className="items-center">
+                <TouchableOpacity
+                  onPress={() => setCustomMinute((m) => (m + 5) % 60)}
+                  className="h-10 w-16 rounded-xl bg-muted/70 items-center justify-center mb-2"
+                >
+                  <Text className="text-lg font-bold text-foreground">+5</Text>
+                </TouchableOpacity>
+                <View className="h-16 w-20 rounded-2xl bg-primary/10 border border-primary/30 items-center justify-center">
+                  <Text className="text-3xl font-extrabold text-primary">
+                    {String(customMinute).padStart(2, '0')}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setCustomMinute((m) => (m - 5 + 60) % 60)}
+                  className="h-10 w-16 rounded-xl bg-muted/70 items-center justify-center mt-2"
+                >
+                  <Text className="text-lg font-bold text-foreground">-5</Text>
+                </TouchableOpacity>
+                <Text className="text-xs text-muted-foreground mt-1">Phút</Text>
+              </View>
+            </View>
+
+            {/* Chọn nhanh phút 00, 15, 30, 45 */}
+            <View className="flex-row gap-2 mb-5">
+              {[0, 15, 30, 45].map((m) => (
+                <TouchableOpacity
+                  key={m}
+                  onPress={() => setCustomMinute(m)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 7,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    alignItems: 'center',
+                    backgroundColor: customMinute === m ? '#0D9488' : '#FFFFFF',
+                    borderColor: customMinute === m ? '#0D9488' : '#E2E8F0',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '700',
+                      color: customMinute === m ? '#FFFFFF' : '#0F172A',
+                    }}
+                  >
+                    :{String(m).padStart(2, '0')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View className="flex-row gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 h-11 rounded-xl"
+                onPress={() => setTimePickerVisible(false)}
+              >
+                <Text className="text-sm text-muted-foreground">Huỷ</Text>
+              </Button>
+              <Button
+                variant="default"
+                className="flex-1 bg-primary h-11 rounded-xl"
+                onPress={handleAddCustomTime}
+              >
+                <Text className="text-sm font-bold text-white">Thêm giờ này</Text>
+              </Button>
+            </View>
+          </Card>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

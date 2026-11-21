@@ -86,6 +86,12 @@ export default function RootLayout() {
                   headerShown: false,
                 }}
               />
+              <Stack.Screen
+                name="doctor-prescriptions/index"
+                options={{
+                  headerShown: false,
+                }}
+              />
             </Stack>
             <PortalHost />
           </View>
