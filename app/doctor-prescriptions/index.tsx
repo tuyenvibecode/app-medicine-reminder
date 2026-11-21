@@ -262,11 +262,16 @@ export default function DoctorPrescriptionsScreen() {
   // Khi bấm nút Camera ở chính giữa thanh Bottom Bar -> Tự động mở Modal lưu đơn và bật Camera chụp ngay
   useEffect(() => {
     if (autoCapture === '1') {
-      openAddModal();
-      const timer = setTimeout(() => {
+      const openTimer = setTimeout(() => {
+        openAddModal();
+      }, 60);
+      const cameraTimer = setTimeout(() => {
         handleTakeHighResPhoto();
-      }, 250);
-      return () => clearTimeout(timer);
+      }, 300);
+      return () => {
+        clearTimeout(openTimer);
+        clearTimeout(cameraTimer);
+      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCapture]);
