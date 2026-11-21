@@ -41,3 +41,8 @@ Thumbs.db
 
 # Typescript
 *.tsbuildinfo
+
+# Kho ảnh thuốc gốc (đã được lưu ở repo riêng data-medicine)
+data-medicine/images/
+data-medicine/medicines.json
+data-medicine/README.md
