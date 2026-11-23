@@ -1,3 +1,4 @@
+// Mục đích: Màn hình Tủ thuốc quản lý danh sách thuốc gia đình, số viên còn lại và cảnh báo sắp hết.
 // app/(tabs)/medications.tsx
 // Màn hình "Tủ thuốc" (Danh sách thuốc hiện có trong gia đình)
 // Hiển thị trực quan thuốc theo đợt điều trị (ví dụ: 30/90 viên) và cảnh báo sắp hết
@@ -9,7 +10,7 @@ import {
   ScrollView,
   TextInput,
   Modal,
-  Alert,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,6 +21,9 @@ import {
   Plus,
   AlertTriangle,
   ShoppingBag,
+  Archive,
+  RotateCcw,
+  Trash2,
   X,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -27,22 +31,81 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { AppAlert as Alert } from '@/components/ui/app-dialog';
 import { useAppStore } from '@/context/AppContext';
 import type { Medication } from '@/types';
 
 export default function MedicationsScreen() {
   const router = useRouter();
-  const { medications, refillMedication } = useAppStore();
+  const {
+    medications,
+    refillMedication,
+    archiveMedication,
+    restoreMedication,
+    deleteMedication,
+  } = useAppStore();
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
 
   // Modal nạp thêm thuốc (khi mua thêm đợt mới)
   const [refillModalVisible, setRefillModalVisible] = useState(false);
   const [refillMed, setRefillMed] = useState<Medication | null>(null);
   const [refillAmount, setRefillAmount] = useState('30');
 
-  const filtered = medications.filter((m) =>
+  const activeMeds = medications.filter((m) => m.is_active !== false);
+  const archivedMeds = medications.filter((m) => m.is_active === false);
+  const currentTabList = activeTab === 'active' ? activeMeds : archivedMeds;
+
+  const filtered = currentTabList.filter((m) =>
     m.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleArchiveMedication = (med: Medication) => {
+    Alert.alert(
+      'Ngừng uống thuốc này?',
+      `"${med.name}" sẽ được chuyển sang mục Đã ngừng và tắt toàn bộ lịch báo thức. Lịch sử các ngày đã uống vẫn được giữ lại.`,
+      [
+        { text: 'Huỷ', style: 'cancel' },
+        {
+          text: 'Ngừng uống',
+          onPress: () => {
+            try {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch {}
+            archiveMedication(med.id);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRestoreMedication = (med: Medication) => {
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+    restoreMedication(med.id);
+    Alert.alert('Đã khôi phục', `"${med.name}" đã quay lại danh sách Đang dùng và bật lại lịch nhắc.`);
+  };
+
+  const handleDeleteMedication = (med: Medication) => {
+    Alert.alert(
+      'Xoá hẳn thuốc này?',
+      `Xoá vĩnh viễn "${med.name}" khỏi Tủ thuốc và huỷ toàn bộ lịch nhắc. Dùng khi thêm nhầm hoặc không cần lưu nữa.`,
+      [
+        { text: 'Huỷ', style: 'cancel' },
+        {
+          text: 'Xoá hẳn',
+          style: 'destructive',
+          onPress: () => {
+            try {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            } catch {}
+            deleteMedication(med.id);
+          },
+        },
+      ]
+    );
+  };
 
   const openRefillModal = (med: Medication) => {
     try {
@@ -105,13 +168,64 @@ export default function MedicationsScreen() {
           </Button>
         </View>
 
+        {/* Thanh chuyển 2 tab: Đang dùng | Đã ngừng (Lưu trữ) */}
+        <View className="flex-row bg-muted/70 p-1 rounded-2xl mb-3">
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setActiveTab('active')}
+            style={{
+              flex: 1,
+              paddingVertical: 9,
+              borderRadius: 13,
+              alignItems: 'center',
+              backgroundColor: activeTab === 'active' ? '#0D9488' : 'transparent',
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: '700',
+                color: activeTab === 'active' ? '#FFFFFF' : '#64748B',
+              }}
+            >
+              Đang dùng ({activeMeds.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setActiveTab('archived')}
+            style={{
+              flex: 1,
+              paddingVertical: 9,
+              borderRadius: 13,
+              alignItems: 'center',
+              backgroundColor: activeTab === 'archived' ? '#0D9488' : 'transparent',
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: '700',
+                color: activeTab === 'archived' ? '#FFFFFF' : '#64748B',
+              }}
+            >
+              Đã ngừng ({archivedMeds.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Thanh tìm kiếm */}
         <View className="flex-row items-center bg-card border border-border/80 rounded-2xl px-3.5 h-12 mb-3">
           <Search size={18} color="#94A3B8" />
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Tìm theo tên thuốc trong tủ..."
+            placeholder={
+              activeTab === 'active'
+                ? 'Tìm thuốc đang dùng...'
+                : 'Tìm trong kho thuốc đã ngừng...'
+            }
             placeholderTextColor="#94A3B8"
             className="flex-1 ml-2.5 text-base text-foreground"
           />
@@ -231,25 +345,83 @@ export default function MedicationsScreen() {
                     </View>
                   )}
 
-                  {/* Nút hành động nhanh: Mua thêm thuốc đợt mới */}
-                  <View className="flex-row items-center justify-between pt-3 mt-2.5 border-t border-border/40">
-                    <Text className="text-xs text-muted-foreground flex-1 mr-2" numberOfLines={1}>
+                  {/* Ghi chú & Hàng nút hành động: Mua thêm / Ngừng uống (hoặc Dùng lại) / Xoá */}
+                  <View className="pt-3 mt-2.5 border-t border-border/40">
+                    <Text className="text-xs text-muted-foreground mb-2.5" numberOfLines={1}>
                       {item.notes || 'Dùng đều đặn mỗi ngày'}
                     </Text>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 px-3 rounded-xl border-primary/30 bg-primary/5"
-                      onPress={() => openRefillModal(item)}
-                    >
-                      <View className="flex-row items-center">
-                        <ShoppingBag size={12} color="#0D9488" />
-                        <Text className="text-xs font-semibold text-primary ml-1">
-                          + Mua thêm
-                        </Text>
-                      </View>
-                    </Button>
+                    <View className="flex-row items-center justify-end gap-2">
+                      {activeTab === 'active' ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 px-3 rounded-xl border-primary/30 bg-primary/5"
+                            onPress={() => openRefillModal(item)}
+                          >
+                            <View className="flex-row items-center">
+                              <ShoppingBag size={13} color="#0D9488" />
+                              <Text className="text-xs font-semibold text-primary ml-1">
+                                + Mua thêm
+                              </Text>
+                            </View>
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 px-3 rounded-xl border-border"
+                            onPress={() => handleArchiveMedication(item)}
+                          >
+                            <View className="flex-row items-center">
+                              <Archive size={13} color="#64748B" />
+                              <Text className="text-xs font-semibold text-muted-foreground ml-1">
+                                Ngừng uống
+                              </Text>
+                            </View>
+                          </Button>
+
+                          <TouchableOpacity
+                            onPress={() => handleDeleteMedication(item)}
+                            accessibilityLabel={`Xoá hẳn thuốc ${item.name}`}
+                            className="h-9 w-9 rounded-xl bg-red-500/10 border border-red-500/20 items-center justify-center"
+                          >
+                            <Trash2 size={15} color="#EF4444" />
+                          </TouchableOpacity>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 px-3 rounded-xl border-primary/30 bg-primary/5"
+                            onPress={() => handleRestoreMedication(item)}
+                          >
+                            <View className="flex-row items-center">
+                              <RotateCcw size={13} color="#0D9488" />
+                              <Text className="text-xs font-semibold text-primary ml-1">
+                                Dùng lại
+                              </Text>
+                            </View>
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 px-3 rounded-xl border-red-500/30 bg-red-500/5"
+                            onPress={() => handleDeleteMedication(item)}
+                          >
+                            <View className="flex-row items-center">
+                              <Trash2 size={13} color="#EF4444" />
+                              <Text className="text-xs font-semibold text-red-500 ml-1">
+                                Xoá hẳn
+                              </Text>
+                            </View>
+                          </Button>
+                        </>
+                      )}
+                    </View>
                   </View>
                 </Card>
               );

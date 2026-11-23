@@ -1,3 +1,4 @@
+// Mục đích: Quản lý thông báo local nhắc uống thuốc và 4 kênh nhạc chuông Android qua expo-notifications.
 // src/lib/notifications.ts
 // Quản lý thông báo local nhắc uống thuốc bằng expo-notifications
 // Hỗ trợ 4 kênh thông báo Android riêng biệt tương ứng 4 kiểu Nhạc chuông / Rung (vì Android 8+ khoá âm thanh theo từng channel)
@@ -62,7 +63,7 @@ try {
       shouldShowList: true,
     }),
   });
-} catch {}
+} catch { }
 
 /**
  * Khởi tạo cả 4 kênh thông báo Android (Tiêu chuẩn / Nhẹ nhàng / Báo thức lớn / Chỉ rung)
@@ -197,6 +198,12 @@ export async function sendTestReminderNotification(
         body: `Đang áp dụng: ${ringtoneName}. Đã đến giờ uống thuốc của bạn!`,
         categoryIdentifier: CATEGORY_MEDICATION_REMINDER,
         sound: getSoundForRingtone(ringtoneId),
+        data: {
+          type: 'MEDICATION_REMINDER',
+          medicationName: 'Thử chuông nhắc thuốc',
+          dosage: ringtoneName,
+          scheduledTime: 'Bây giờ',
+        },
       },
       trigger: {
         type: SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -217,7 +224,10 @@ export async function scheduleSnoozeNotification(
   medicationName: string,
   dosage: string,
   hideDetails = false,
-  ringtoneId: RingtoneId = 'default'
+  ringtoneId: RingtoneId = 'default',
+  doseId?: string,
+  scheduledTime?: string,
+  imageUrl?: string | null
 ): Promise<string | null> {
   try {
     const granted = await requestNotificationPermissions();
@@ -231,6 +241,14 @@ export async function scheduleSnoozeNotification(
         body: hideDetails ? 'Mở ứng dụng để xem chi tiết liều thuốc của bạn' : `Liều lượng: ${dosage}`,
         categoryIdentifier: CATEGORY_MEDICATION_REMINDER,
         sound: getSoundForRingtone(ringtoneId),
+        data: {
+          type: 'MEDICATION_REMINDER',
+          doseId: doseId || '',
+          medicationName,
+          dosage,
+          scheduledTime: scheduledTime || '',
+          imageUrl: imageUrl || '',
+        },
       },
       trigger: {
         type: SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -244,7 +262,44 @@ export async function scheduleSnoozeNotification(
 }
 
 /**
- * Đặt lịch nhắc uống thuốc hàng ngày theo giờ:phút và đúng kênh nhạc chuông
+ * Tính danh sách thời điểm báo thức chính xác tới từng giây (:00) cho N ngày kế tiếp.
+ * Dùng trigger dạng DATE thay cho DAILY trên Android vì AlarmManager.setRepeating (DAILY)
+ * bị Android gom lịch nên hay báo sớm 1 phút hoặc trễ 2-5 phút.
+ */
+export function getNextExactReminderDates(
+  hour: number,
+  minute: number,
+  daysCount = 7,
+  now = new Date(),
+  skipToday = false
+): Date[] {
+  const first = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    hour,
+    minute,
+    0,
+    0
+  );
+
+  // Nếu giờ này hôm nay đã qua hoặc liều hôm nay đã uống -> bắt đầu từ ngày mai
+  if (skipToday || first.getTime() <= now.getTime()) {
+    first.setDate(first.getDate() + 1);
+  }
+
+  const dates: Date[] = [];
+  for (let i = 0; i < daysCount; i++) {
+    const d = new Date(first.getTime());
+    d.setDate(first.getDate() + i);
+    dates.push(d);
+  }
+  return dates;
+}
+
+/**
+ * Đặt lịch nhắc uống thuốc chính xác từng giây (dùng DATE trigger cho 7 ngày kế tiếp)
+ * theo giờ:phút và đúng kênh nhạc chuông.
  */
 export async function scheduleDailyReminder(
   medicationName: string,
@@ -252,30 +307,48 @@ export async function scheduleDailyReminder(
   hour: number,
   minute: number,
   hideDetails = false,
-  ringtoneId: RingtoneId = 'default'
+  ringtoneId: RingtoneId = 'default',
+  doseId?: string,
+  imageUrl?: string | null,
+  skipToday = false
 ): Promise<string | null> {
   try {
     const granted = await requestNotificationPermissions();
     if (!granted) return null;
 
     const channelId = getChannelIdForRingtone(ringtoneId);
+    const scheduledTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    const exactDates = getNextExactReminderDates(hour, minute, 7, new Date(), skipToday);
 
-    return await scheduleNotificationAsync({
-      content: {
-        title: hideDetails ? 'Đến giờ uống thuốc' : `Nhắc uống thuốc: ${medicationName}`,
-        body: hideDetails
-          ? 'Mở ứng dụng để xem chi tiết liều thuốc của bạn'
-          : dosage || 'Đã đến giờ uống thuốc của bạn',
-        categoryIdentifier: CATEGORY_MEDICATION_REMINDER,
-        sound: getSoundForRingtone(ringtoneId),
-      },
-      trigger: {
-        type: SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
-        channelId: Platform.OS === 'android' ? channelId : undefined,
-      },
-    });
+    let firstId: string | null = null;
+    for (const targetDate of exactDates) {
+      const id = await scheduleNotificationAsync({
+        content: {
+          title: hideDetails ? 'Đến giờ uống thuốc' : `Nhắc uống thuốc: ${medicationName}`,
+          body: hideDetails
+            ? 'Mở ứng dụng để xem chi tiết liều thuốc của bạn'
+            : dosage || 'Đã đến giờ uống thuốc của bạn',
+          categoryIdentifier: CATEGORY_MEDICATION_REMINDER,
+          sound: getSoundForRingtone(ringtoneId),
+          data: {
+            type: 'MEDICATION_REMINDER',
+            doseId: doseId || '',
+            medicationName,
+            dosage: dosage || '',
+            scheduledTime,
+            imageUrl: imageUrl || '',
+          },
+        },
+        trigger: {
+          type: SchedulableTriggerInputTypes.DATE,
+          date: targetDate,
+          channelId: Platform.OS === 'android' ? channelId : undefined,
+        },
+      });
+      if (!firstId) firstId = id;
+    }
+
+    return firstId;
   } catch {
     return null;
   }
@@ -287,7 +360,8 @@ export async function scheduleDailyReminder(
 export async function rescheduleAllDailyReminders(
   doses: DoseTimelineItem[],
   ringtoneId: RingtoneId,
-  hideDetails: boolean
+  hideDetails: boolean,
+  takenTodayIds?: Set<string>
 ): Promise<void> {
   try {
     await setupNotificationChannels();
@@ -302,13 +376,18 @@ export async function rescheduleAllDailyReminders(
       const minute = parseInt(mStr || '0', 10);
       if (isNaN(hour) || isNaN(minute)) continue;
 
+      const skipToday = Boolean(takenTodayIds?.has(dose.id) || dose.status === 'taken');
+
       await scheduleDailyReminder(
         dose.medicationName,
         dose.dosage,
         hour,
         minute,
         hideDetails,
-        ringtoneId
+        ringtoneId,
+        dose.id,
+        dose.image,
+        skipToday
       );
     }
   } catch {

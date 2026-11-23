@@ -1,8 +1,9 @@
+// Mục đích: Context quản lý trạng thái trung tâm cho tủ thuốc, lịch nhắc, lịch sử và đơn thuốc.
 // src/context/AppContext.tsx
 // Quản lý trạng thái trung tâm của ứng dụng: Tủ thuốc, Lịch nhắc hôm nay, Lịch sử uống,
 // Đơn thuốc bác sĩ kê (ảnh sắc nét) và Cấu hình giờ nhắc & Nhạc chuông.
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { format, subDays } from 'date-fns';
 import {
   scheduleDailyReminder,
@@ -10,6 +11,11 @@ import {
   rescheduleAllDailyReminders,
 } from '@/lib/notifications';
 import { loadReminderSettings, saveReminderSettings } from '@/lib/securityConfig';
+import {
+  loadAppLocalData,
+  saveAppLocalData,
+  syncNewMedicationToSupabase,
+} from '@/lib/localDataStore';
 import type {
   Medication,
   DoseTimelineItem,
@@ -232,6 +238,9 @@ interface AppContextValue {
   undoTakeDose: (item: DoseTimelineItem, date?: Date) => void;
   snoozeDose: (item: DoseTimelineItem) => void;
   refillMedication: (medicationId: string, addCount: number) => void;
+  archiveMedication: (medicationId: string) => void;
+  restoreMedication: (medicationId: string) => void;
+  deleteMedication: (medicationId: string) => void;
   addMedication: (input: AddMedicationInput) => void;
   syncPrescriptionToReminders: (items: PrescriptionMedicineItem[]) => void;
   addDoctorPrescription: (item: Omit<DoctorPrescription, 'id' | 'createdAt'>) => void;
@@ -260,15 +269,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(
     INITIAL_REMINDER_SETTINGS
   );
-
-  // Tự động tải lại cấu hình giờ nhắc & nhạc chuông đã lưu trên thiết bị khi mở app
-  useEffect(() => {
-    loadReminderSettings().then((saved) => {
-      if (saved) {
-        setReminderSettings((prev) => ({ ...prev, ...saved }));
-      }
-    });
-  }, []);
+  const isHydratedRef = useRef(false);
 
   // Lưu trạng thái đã uống theo từng ngày 'yyyy-MM-dd' -> { [doseId]: 'taken' | 'upcoming' }
   const [dateDoseStatusMap, setDateDoseStatusMap] = useState<
@@ -292,30 +293,80 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return initialMap;
   });
 
-  // Lấy danh sách liều thuốc kèm trạng thái đúng của ngày được chọn trên Lịch
+  // Tự động tải lại cấu hình giờ nhắc + toàn bộ dữ liệu thuốc/lịch đã lưu trên thiết bị khi mở app
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([loadReminderSettings(), loadAppLocalData()]).then(([savedSettings, savedData]) => {
+      if (!mounted) return;
+      if (savedSettings) {
+        setReminderSettings((prev) => ({ ...prev, ...savedSettings }));
+      }
+      if (savedData) {
+        if (Array.isArray(savedData.medications) && savedData.medications.length > 0) {
+          setMedications(savedData.medications);
+        }
+        if (Array.isArray(savedData.doses) && savedData.doses.length > 0) {
+          setDoses(savedData.doses);
+        }
+        if (Array.isArray(savedData.historyLogs)) {
+          setHistoryLogs(savedData.historyLogs);
+        }
+        if (Array.isArray(savedData.doctorPrescriptions)) {
+          setDoctorPrescriptions(savedData.doctorPrescriptions);
+        }
+        if (savedData.dateDoseStatusMap && typeof savedData.dateDoseStatusMap === 'object') {
+          setDateDoseStatusMap(savedData.dateDoseStatusMap);
+        }
+      }
+      isHydratedRef.current = true;
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Tự động lưu dữ liệu cục bộ mỗi khi có thay đổi (thêm thuốc, uống thuốc, lưu đơn...) để reload không bị mất
+  useEffect(() => {
+    if (!isHydratedRef.current) return;
+    saveAppLocalData({
+      medications,
+      doses,
+      historyLogs,
+      doctorPrescriptions,
+      dateDoseStatusMap,
+    });
+  }, [medications, doses, historyLogs, doctorPrescriptions, dateDoseStatusMap]);
+
+  // Lấy danh sách liều thuốc đang hoạt động kèm trạng thái đúng của ngày được chọn trên Lịch
   const getDosesForDate = useCallback(
     (date: Date): DoseTimelineItem[] => {
       const dateKey = format(date, 'yyyy-MM-dd');
       const todayKey = format(new Date(), 'yyyy-MM-dd');
       const statusMapForDate = dateDoseStatusMap[dateKey] || {};
+      const inactiveMedIds = new Set(
+        medications.filter((m) => m.is_active === false).map((m) => m.id)
+      );
 
-      return doses.map((d) => {
-        if (dateKey === todayKey) {
-          const override = statusMapForDate[d.id];
-          return override ? { ...d, status: override } : d;
-        }
-        if (dateKey > todayKey) {
-          // Ngày trong tương lai: mặc định chưa uống
-          return { ...d, status: statusMapForDate[d.id] || 'upcoming' };
-        }
-        // Ngày trong quá khứ: lấy từ lịch sử ngày đó
-        return {
-          ...d,
-          status: statusMapForDate[d.id] || 'upcoming',
-        };
-      });
+      return doses
+        .filter((d) => !inactiveMedIds.has(d.medicationId))
+        .map((d) => {
+          if (dateKey === todayKey) {
+            const override = statusMapForDate[d.id];
+            return override ? { ...d, status: override } : d;
+          }
+          if (dateKey > todayKey) {
+            // Ngày trong tương lai: mặc định chưa uống
+            return { ...d, status: statusMapForDate[d.id] || 'upcoming' };
+          }
+          // Ngày trong quá khứ: lấy từ lịch sử ngày đó
+          return {
+            ...d,
+            status: statusMapForDate[d.id] || 'upcoming',
+          };
+        });
     },
-    [doses, dateDoseStatusMap]
+    [doses, medications, dateDoseStatusMap]
   );
 
   // Kiểm tra ngày đó đã uống đủ 100% liều chưa (để hiện chấm hoàn thành trên Lịch tuần)
@@ -413,7 +464,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
       ...prev,
     ]);
-  }, []);
+
+    // Nếu vừa xác nhận uống cho hôm nay -> huỷ ngay thông báo OS còn chờ của cữ hôm nay để tránh báo lại trễ
+    if (dateKey === todayKey) {
+      const inactiveMedIds = new Set(
+        medications.filter((m) => m.is_active === false).map((m) => m.id)
+      );
+      const activeDoses = doses.filter((d) => !inactiveMedIds.has(d.medicationId));
+      const takenIds = new Set<string>([item.id]);
+      const todayMap = dateDoseStatusMap[todayKey] || {};
+      Object.entries(todayMap).forEach(([id, st]) => {
+        if (st === 'taken') takenIds.add(id);
+      });
+      rescheduleAllDailyReminders(
+        activeDoses,
+        reminderSettings.ringtoneId,
+        reminderSettings.hideDetailsOnLock,
+        takenIds
+      ).catch(() => {});
+    }
+  }, [
+    doses,
+    medications,
+    dateDoseStatusMap,
+    reminderSettings.ringtoneId,
+    reminderSettings.hideDetailsOnLock,
+  ]);
 
   // Hoàn tác trạng thái đã uống (theo đúng ngày đang chọn trên Lịch)
   const undoTakeDose = useCallback((item: DoseTimelineItem, targetDate?: Date) => {
@@ -485,7 +561,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         item.medicationName,
         item.dosage,
         reminderSettings.hideDetailsOnLock,
-        reminderSettings.ringtoneId
+        reminderSettings.ringtoneId,
+        item.id,
+        item.scheduledTime,
+        item.image
       ).catch(() => {});
     },
     [reminderSettings.hideDetailsOnLock, reminderSettings.ringtoneId]
@@ -512,6 +591,78 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       })
     );
   }, []);
+
+  // Ngừng uống / Lưu trữ thuốc (tắt báo thức, ẩn khỏi Hôm nay nhưng giữ nguyên lịch sử đã uống)
+  const archiveMedication = useCallback(
+    (medicationId: string) => {
+      setMedications((prev) =>
+        prev.map((m) =>
+          m.id === medicationId
+            ? { ...m, is_active: false, updated_at: new Date().toISOString() }
+            : m
+        )
+      );
+
+      const inactiveMedIds = new Set(
+        medications.filter((m) => m.is_active === false).map((m) => m.id)
+      );
+      inactiveMedIds.add(medicationId);
+      const remainingActiveDoses = doses.filter((d) => !inactiveMedIds.has(d.medicationId));
+      rescheduleAllDailyReminders(
+        remainingActiveDoses,
+        reminderSettings.ringtoneId,
+        reminderSettings.hideDetailsOnLock
+      ).catch(() => {});
+    },
+    [doses, medications, reminderSettings.ringtoneId, reminderSettings.hideDetailsOnLock]
+  );
+
+  // Dùng lại thuốc từ kho Đã ngừng (hiện lại ở Hôm nay và đặt lại lịch báo thức)
+  const restoreMedication = useCallback(
+    (medicationId: string) => {
+      setMedications((prev) =>
+        prev.map((m) =>
+          m.id === medicationId
+            ? { ...m, is_active: true, updated_at: new Date().toISOString() }
+            : m
+        )
+      );
+
+      const inactiveMedIds = new Set(
+        medications
+          .filter((m) => m.is_active === false && m.id !== medicationId)
+          .map((m) => m.id)
+      );
+      const activeDoses = doses.filter((d) => !inactiveMedIds.has(d.medicationId));
+      rescheduleAllDailyReminders(
+        activeDoses,
+        reminderSettings.ringtoneId,
+        reminderSettings.hideDetailsOnLock
+      ).catch(() => {});
+    },
+    [doses, medications, reminderSettings.ringtoneId, reminderSettings.hideDetailsOnLock]
+  );
+
+  // Xoá hẳn thuốc khỏi tủ thuốc, xoá lịch uống và huỷ toàn bộ báo thức liên quan
+  const deleteMedication = useCallback(
+    (medicationId: string) => {
+      setMedications((prev) => prev.filter((m) => m.id !== medicationId));
+      setDoses((prev) => {
+        const nextDoses = prev.filter((d) => d.medicationId !== medicationId);
+        const inactiveMedIds = new Set(
+          medications.filter((m) => m.is_active === false).map((m) => m.id)
+        );
+        const activeDoses = nextDoses.filter((d) => !inactiveMedIds.has(d.medicationId));
+        rescheduleAllDailyReminders(
+          activeDoses,
+          reminderSettings.ringtoneId,
+          reminderSettings.hideDetailsOnLock
+        ).catch(() => {});
+        return nextDoses;
+      });
+    },
+    [medications, reminderSettings.ringtoneId, reminderSettings.hideDetailsOnLock]
+  );
 
   // Thêm thuốc mới vào tủ thuốc và tự động tạo lịch nhắc trong ngày
   const addMedication = useCallback((input: AddMedicationInput) => {
@@ -546,17 +697,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const hour = parseInt(hStr || '7', 10);
       const minute = parseInt(mStr || '30', 10);
 
+      const doseId = `dose-${Date.now()}-${idx}`;
+
       scheduleDailyReminder(
         newMed.name,
         cleanDosage,
         hour,
         minute,
         reminderSettings.hideDetailsOnLock,
-        reminderSettings.ringtoneId
+        reminderSettings.ringtoneId,
+        doseId,
+        newMed.image
       ).catch(() => {});
 
       return {
-        id: `dose-${Date.now()}-${idx}`,
+        id: doseId,
         scheduleId: `sched-${Date.now()}-${idx}`,
         medicationId: medId,
         medicationName: newMed.name,
@@ -575,6 +730,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
 
     setDoses((prev) => [...prev, ...newDoses]);
+
+    // Đồng bộ ngầm lên Supabase nếu tài khoản đã đăng nhập
+    const clockTimes = timesToSchedule.map((raw) => raw.split(' ')[0] || '07:30');
+    syncNewMedicationToSupabase(newMed, clockTimes).catch(() => {});
   }, [reminderSettings.hideDetailsOnLock, reminderSettings.ringtoneId]);
 
   // Đồng bộ toàn bộ thuốc từ Phiếu đơn thuốc vào Tủ thuốc và Lịch nhắc hôm nay
@@ -627,17 +786,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         times.forEach((clockTime, tIdx) => {
           const [hStr, mStr] = clockTime.split(':');
+          const doseId = `rx-dose-${Date.now()}-${index}-${tIdx}`;
           scheduleDailyReminder(
             item.name,
             item.dosageInstruction,
             parseInt(hStr || '8', 10),
             parseInt(mStr || '0', 10),
             reminderSettings.hideDetailsOnLock,
-            reminderSettings.ringtoneId
+            reminderSettings.ringtoneId,
+            doseId,
+            item.image || null
           ).catch(() => {});
 
           addedDoses.push({
-            id: `rx-dose-${Date.now()}-${index}-${tIdx}`,
+            id: doseId,
             scheduleId: `rx-sched-${Date.now()}-${index}-${tIdx}`,
             medicationId: medId,
             medicationName: item.name,
@@ -750,6 +912,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         undoTakeDose,
         snoozeDose,
         refillMedication,
+        archiveMedication,
+        restoreMedication,
+        deleteMedication,
         addMedication,
         syncPrescriptionToReminders,
         addDoctorPrescription,

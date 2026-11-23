@@ -1,3 +1,4 @@
+// Mục đích: Màn hình quản trị gia đình cho chủ hộ quản lý thành viên, mã mời và phân quyền.
 // app/admin/index.tsx
 // Trang Quản trị Thành viên & Tài khoản Gia đình
 // Dành riêng cho Chủ hộ (Admin) quản lý các thành viên, cấp mã mời và phân quyền
@@ -9,10 +10,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { AppAlert as Alert } from '@/components/ui/app-dialog';
 import {
   ArrowLeft,
   Users,
@@ -87,7 +88,7 @@ export default function FamilyAdminScreen() {
     if (!code) return;
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
+    } catch { }
     Alert.alert(
       'Đã sao chép mã mời',
       `Mã mời: "${code}". Bạn có thể gửi mã này qua Zalo/Tin nhắn cho người nhà nhập vào app.`
@@ -102,7 +103,7 @@ export default function FamilyAdminScreen() {
 
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
+    } catch { }
 
     // Tạo mã mời 6 ký tự ngẫu nhiên
     const randomCode = `GD-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -212,13 +213,12 @@ export default function FamilyAdminScreen() {
                 <View className="flex-row items-center flex-1 mr-2">
                   {/* Icon theo vai trò */}
                   <View
-                    className={`h-12 w-12 rounded-2xl items-center justify-center ${
-                      isAdmin
+                    className={`h-12 w-12 rounded-2xl items-center justify-center ${isAdmin
                         ? 'bg-primary/15'
                         : isPharmacist
-                        ? 'bg-blue-500/15'
-                        : 'bg-emerald-500/15'
-                    }`}
+                          ? 'bg-blue-500/15'
+                          : 'bg-emerald-500/15'
+                      }`}
                   >
                     {isAdmin ? (
                       <ShieldCheck size={22} color="#0D9488" />
@@ -251,8 +251,8 @@ export default function FamilyAdminScreen() {
                     isAdmin
                       ? 'Chủ hộ'
                       : isPharmacist
-                      ? 'Dược sĩ'
-                      : 'Người bệnh'
+                        ? 'Dược sĩ'
+                        : 'Người bệnh'
                   }
                 />
               </View>
@@ -283,9 +283,8 @@ export default function FamilyAdminScreen() {
                       onPress={() => handleToggleMemberActive(member)}
                     >
                       <Text
-                        className={`text-xs font-medium ${
-                          member.isActive ? 'text-muted-foreground' : 'text-emerald-600'
-                        }`}
+                        className={`text-xs font-medium ${member.isActive ? 'text-muted-foreground' : 'text-emerald-600'
+                          }`}
                       >
                         {member.isActive ? 'Tạm khoá' : 'Mở khoá'}
                       </Text>
@@ -350,16 +349,14 @@ export default function FamilyAdminScreen() {
             <View className="flex-row gap-2 mb-5">
               <TouchableOpacity
                 onPress={() => setNewRole('patient')}
-                className={`flex-1 p-2.5 rounded-xl border items-center ${
-                  newRole === 'patient'
+                className={`flex-1 p-2.5 rounded-xl border items-center ${newRole === 'patient'
                     ? 'bg-primary/10 border-primary'
                     : 'bg-card border-border'
-                }`}
+                  }`}
               >
                 <Text
-                  className={`text-xs font-semibold ${
-                    newRole === 'patient' ? 'text-primary' : 'text-foreground'
-                  }`}
+                  className={`text-xs font-semibold ${newRole === 'patient' ? 'text-primary' : 'text-foreground'
+                    }`}
                 >
                   Người bệnh
                 </Text>
@@ -370,16 +367,14 @@ export default function FamilyAdminScreen() {
 
               <TouchableOpacity
                 onPress={() => setNewRole('pharmacist')}
-                className={`flex-1 p-2.5 rounded-xl border items-center ${
-                  newRole === 'pharmacist'
+                className={`flex-1 p-2.5 rounded-xl border items-center ${newRole === 'pharmacist'
                     ? 'bg-primary/10 border-primary'
                     : 'bg-card border-border'
-                }`}
+                  }`}
               >
                 <Text
-                  className={`text-xs font-semibold ${
-                    newRole === 'pharmacist' ? 'text-primary' : 'text-foreground'
-                  }`}
+                  className={`text-xs font-semibold ${newRole === 'pharmacist' ? 'text-primary' : 'text-foreground'
+                    }`}
                 >
                   Dược sĩ gia đình
                 </Text>

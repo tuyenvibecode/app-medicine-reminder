@@ -1,6 +1,6 @@
 ---
-trigger: always_on
-description: Quy tắc UI - NativeWind + React Native Reusables (kiểu shadcn), bám thiết kế Stitch
+trigger: model_decision
+description: Đọc khi làm hoặc sửa giao diện, màn hình, component, theme, hiệu ứng - quy tắc NativeWind + React Native Reusables, bám thiết kế Stitch, cỡ chữ và vùng bấm, dark mode
 ---
 
 # Quy tắc UI

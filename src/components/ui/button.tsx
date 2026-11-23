@@ -1,3 +1,4 @@
+// Mục đích: Component nút bấm (Button) dùng chung có hiệu ứng nhún lò xo và phản hồi rung.
 // src/components/ui/button.tsx
 // Nút bấm phong cách shadcn (React Native Reusables)
 // Có hiệu ứng nhún lò xo mượt (spring animation) và rung phản hồi (haptics)

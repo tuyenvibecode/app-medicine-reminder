@@ -1,3 +1,4 @@
+// Mục đích: Màn hình cấu hình khung giờ nhắc, nhạc chuông báo thức, bảo mật sinh trắc học và AI.
 // app/settings.tsx
 // Màn hình Cấu hình Thời gian nhắc uống thuốc, Nhạc chuông báo thức & Bảo mật vân tay
 // Đặt ở cấp Stack gốc (app/settings.tsx) để không bị xung đột route với nhóm (tabs) và tự động ẩn Bottom Bar.
@@ -8,7 +9,6 @@ import {
   Text,
   ScrollView,
   Switch,
-  Alert,
   TouchableOpacity,
   Modal,
   Platform,
@@ -37,6 +37,8 @@ import * as Haptics from 'expo-haptics';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { WheelTimePicker } from '@/components/ui/wheel-time-picker';
+import { AppAlert as Alert } from '@/components/ui/app-dialog';
 import { useAppStore } from '@/context/AppContext';
 import {
   setupNotificationChannels,
@@ -82,7 +84,7 @@ type TimeSlotKey = 'morningTime' | 'noonTime' | 'afternoonTime' | 'eveningTime';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { reminderSettings, updateReminderSettings } = useAppStore();
+  const { doses, reminderSettings, updateReminderSettings } = useAppStore();
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [privacyShieldEnabled, setPrivacyShieldEnabled] = useState(true);
   const [isTestingSound, setIsTestingSound] = useState(false);
@@ -464,6 +466,37 @@ export default function SettingsScreen() {
                 : 'Nghe / Phát thử thông báo nhắc thuốc'}
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              const nextDose = doses.find((d) => d.status !== 'taken') || doses[0];
+              router.push({
+                pathname: '/reminder/alarm' as any,
+                params: {
+                  doseId: nextDose?.id || '',
+                  medicationName: nextDose?.medicationName || 'Amlodipine 5mg (Huyết áp)',
+                  dosage: nextDose?.dosage || '1 viên - Sau ăn',
+                  scheduledTime: nextDose?.scheduledTime || reminderSettings.morningTime,
+                  imageUrl: nextDose?.image || '',
+                },
+              });
+            }}
+            style={{
+              marginTop: 8,
+              backgroundColor: '#0D9488',
+              height: 44,
+              borderRadius: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Bell size={16} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13, marginLeft: 8 }}>
+              Xem thử màn hình Mèo nhắc uống thuốc
+            </Text>
+          </TouchableOpacity>
         </Card>
 
         {/* 3. Tuỳ chọn Báo thức & Riêng tư */}
@@ -648,54 +681,13 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Bộ chỉnh Giờ : Phút to rõ */}
-            <View className="flex-row items-center justify-center my-6 gap-4">
-              {/* Cột Giờ */}
-              <View className="items-center">
-                <TouchableOpacity
-                  onPress={() => setTempHour((h) => (h + 1) % 24)}
-                  className="h-10 w-16 rounded-xl bg-muted/70 items-center justify-center mb-2"
-                >
-                  <Text className="text-lg font-bold text-foreground">+</Text>
-                </TouchableOpacity>
-                <View className="h-16 w-20 rounded-2xl bg-primary/10 border border-primary/30 items-center justify-center">
-                  <Text className="text-3xl font-extrabold text-primary">
-                    {String(tempHour).padStart(2, '0')}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setTempHour((h) => (h - 1 + 24) % 24)}
-                  className="h-10 w-16 rounded-xl bg-muted/70 items-center justify-center mt-2"
-                >
-                  <Text className="text-lg font-bold text-foreground">-</Text>
-                </TouchableOpacity>
-                <Text className="text-xs text-muted-foreground mt-1">Giờ</Text>
-              </View>
-
-              <Text className="text-3xl font-extrabold text-foreground pb-5">:</Text>
-
-              {/* Cột Phút */}
-              <View className="items-center">
-                <TouchableOpacity
-                  onPress={() => setTempMinute((m) => (m + 5) % 60)}
-                  className="h-10 w-16 rounded-xl bg-muted/70 items-center justify-center mb-2"
-                >
-                  <Text className="text-lg font-bold text-foreground">+5</Text>
-                </TouchableOpacity>
-                <View className="h-16 w-20 rounded-2xl bg-primary/10 border border-primary/30 items-center justify-center">
-                  <Text className="text-3xl font-extrabold text-primary">
-                    {String(tempMinute).padStart(2, '0')}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setTempMinute((m) => (m - 5 + 60) % 60)}
-                  className="h-10 w-16 rounded-xl bg-muted/70 items-center justify-center mt-2"
-                >
-                  <Text className="text-lg font-bold text-foreground">-5</Text>
-                </TouchableOpacity>
-                <Text className="text-xs text-muted-foreground mt-1">Phút</Text>
-              </View>
-            </View>
+            {/* Bộ chỉnh Giờ : Phút dạng con lăn vuốt cuộn bằng tay */}
+            <WheelTimePicker
+              hour={tempHour}
+              minute={tempMinute}
+              onChangeHour={setTempHour}
+              onChangeMinute={setTempMinute}
+            />
 
             {/* Chọn nhanh phút chuẩn */}
             <View className="flex-row gap-2 mb-5">

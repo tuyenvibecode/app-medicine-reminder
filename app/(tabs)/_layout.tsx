@@ -1,3 +1,4 @@
+// Mục đích: Layout điều hướng tab chính với thanh nổi đáy và nút chụp nhanh đơn thuốc.
 // app/(tabs)/_layout.tsx
 // Thanh điều hướng đáy (Custom Floating Bottom Bar)
 // Chuẩn tỷ lệ Mobile UI hiện đại: Bo góc vừa phải (18px đồng bộ với Card), khoảng hở 2 bên cân đối (14px),

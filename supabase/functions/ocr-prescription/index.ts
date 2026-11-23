@@ -1,3 +1,4 @@
+// Mục đích: Supabase Edge Function đọc chữ từ ảnh đơn thuốc bằng Gemini Interactions API có dự phòng.
 // supabase/functions/ocr-prescription/index.ts
 // Supabase Edge Function đọc chữ từ ảnh đơn thuốc (OCR) bằng Gemini Interactions API (v1)
 // Tuân thủ rule 01-security.md & 04-medical-safety.md:

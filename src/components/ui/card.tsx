@@ -1,3 +1,4 @@
+// Mục đích: Component thẻ chứa nội dung (Card) dùng chung theo phong cách React Native Reusables.
 // src/components/ui/card.tsx
 // Thẻ hiển thị kiểu shadcn (React Native Reusables)
 // Thiết kế bo tròn mềm mại (radius 20-24px), viền mỏng tinh tế, bóng đổ nhẹ

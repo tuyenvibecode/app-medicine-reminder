@@ -1,3 +1,4 @@
+// Mục đích: Component nhãn trạng thái (Badge) dùng chung theo phong cách React Native Reusables.
 // src/components/ui/badge.tsx
 // Nhãn trạng thái chuẩn shadcn
 

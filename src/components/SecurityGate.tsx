@@ -1,3 +1,4 @@
+// Mục đích: Lớp bảo vệ khoá sinh trắc học và màn hình che riêng tư khi chuyển đa nhiệm.
 // src/components/SecurityGate.tsx
 // Lớp bảo vệ toàn ứng dụng:
 // 1. Khoá app bằng Vân tay / Khuôn mặt / PIN khi mở app hoặc khi từ chế độ nền quay lại quá 30 giây.

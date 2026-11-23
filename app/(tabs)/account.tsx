@@ -1,3 +1,4 @@
+// Mục đích: Màn hình tài khoản, đồng bộ phiên đăng nhập và lối vào đơn thuốc, cài đặt, quản trị gia đình.
 // app/(tabs)/account.tsx
 // Màn hình "Tài khoản", Lưu trữ Đơn thuốc Bác sĩ & Trung tâm Quản trị Gia đình
 
@@ -7,10 +8,10 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { AppAlert as Alert } from '@/components/ui/app-dialog';
 import {
   User,
   Shield,

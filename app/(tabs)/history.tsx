@@ -1,3 +1,4 @@
+// Mục đích: Màn hình hiển thị lịch sử uống thuốc và tỷ lệ tuân thủ theo ngày.
 // app/(tabs)/history.tsx
 // Màn hình "Lịch sử" uống thuốc và tỷ lệ tuân thủ
 

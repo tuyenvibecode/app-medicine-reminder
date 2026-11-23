@@ -1,3 +1,4 @@
+// Mục đích: Màn hình lưu ảnh đơn thuốc bác sĩ HD, đọc chữ bằng AI và so sánh chỉ số sức khoẻ.
 // app/doctor-prescriptions/index.tsx
 // Màn hình "Đơn thuốc của bạn"
 // Lưu ảnh chụp toa thuốc độ phân giải gốc (HD), AI tự động đọc ảnh điền tên thuốc/loại bệnh/ghi chú tái khám,
@@ -10,12 +11,12 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Alert,
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { AppAlert as Alert } from '@/components/ui/app-dialog';
 import { Image } from 'expo-image';
 import {
   ArrowLeft,

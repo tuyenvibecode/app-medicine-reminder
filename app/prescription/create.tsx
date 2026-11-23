@@ -1,3 +1,4 @@
+// Mục đích: Màn hình tạo phiếu note đơn thuốc gia đình và chia sẻ dạng chữ hoặc ảnh.
 // app/prescription/create.tsx
 // Màn hình Lên đơn thuốc dành cho Dược sĩ gia đình
 // Tìm kiếm thuốc từ data chi_thuoc.json, chọn số lượng viên và xuất Phiếu Note Toa thuốc có ảnh
@@ -11,12 +12,12 @@ import {
   Pressable,
   TextInput,
   Modal,
-  Alert,
   Share,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { AppAlert as Alert } from '@/components/ui/app-dialog';
 import { Image } from 'expo-image';
 import ViewShot, { captureScreen, releaseCapture, type ViewShotRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';

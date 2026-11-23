@@ -1,3 +1,4 @@
+// Mục đích: Khai báo toàn bộ kiểu dữ liệu TypeScript dùng chung cho thuốc, lịch nhắc và gia đình.
 // src/types/index.ts
 // Định nghĩa kiểu dữ liệu dùng chung trong toàn bộ app
 

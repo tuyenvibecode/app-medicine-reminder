@@ -1,6 +1,6 @@
 ---
-trigger: always_on
-description: Quy ước code, cấu trúc thư mục, cách comment và giải thích cho chủ dự án
+trigger: model_decision
+description: Đọc khi viết hoặc sửa code - quy ước TypeScript, cấu trúc thư mục, cách comment tiếng Việt, mẫu báo cáo sau khi làm xong, quy ước git
 ---
 
 # Quy ước code

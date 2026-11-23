@@ -1,3 +1,4 @@
+// Mục đích: Cấu hình Metro bundler kết nối NativeWind và file global.css.
 const { getDefaultConfig } = require('expo/metro-config');
 const { withNativeWind } = require('nativewind/metro');
 

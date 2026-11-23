@@ -1,3 +1,4 @@
+// Mục đích: Màn hình thêm thuốc mới từ danh mục hoặc ảnh chụp và thiết lập khung giờ nhắc uống.
 // app/medication/add.tsx
 // Màn hình Thêm thuốc mới vào tủ thuốc & đặt lịch nhắc
 // Tích hợp: Tìm nhanh từ kho 2.000+ thuốc (có sẵn ảnh), hoặc tự chụp/chọn từ Album,
@@ -11,7 +12,6 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -23,6 +23,7 @@ import {
   Clock,
   Pill,
   Check,
+  CheckCircle2,
   Calendar,
   AlertCircle,
   ShoppingBag,
@@ -36,6 +37,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { WheelTimePicker } from '@/components/ui/wheel-time-picker';
+import { AppAlert as Alert } from '@/components/ui/app-dialog';
 import { useAppStore } from '@/context/AppContext';
 import { searchMedicines } from '@/services/medicineService';
 import type { TreatmentType, CatalogMedicine } from '@/types';
@@ -105,14 +108,22 @@ export default function AddMedicationScreen() {
   );
 
   const [customTimeOptions, setCustomTimeOptions] = useState<string[]>([]);
-  const [selectedTimes, setSelectedTimes] = useState<string[]>(() => [
-    `${reminderSettings.morningTime} (Sáng)`,
-  ]);
+  // Không tự tích sẵn 07:30 để tránh tạo nhầm cữ sáng khi người dùng chỉ muốn thêm giờ tuỳ ý (vd: 17:30)
+  const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
 
   // Modal thêm giờ uống thuốc tuỳ chỉnh tự do
   const [timePickerVisible, setTimePickerVisible] = useState(false);
-  const [customHour, setCustomHour] = useState(8);
-  const [customMinute, setCustomMinute] = useState(30);
+  const [customHour, setCustomHour] = useState(() => new Date().getHours());
+  const [customMinute, setCustomMinute] = useState(() => Math.floor(new Date().getMinutes() / 5) * 5);
+
+  // Modal thông báo lưu thuốc thành công đẹp mắt (thay cho Alert hệ thống)
+  const [successSummary, setSuccessSummary] = useState<{
+    name: string;
+    image: string | null;
+    times: string[];
+    stock: number;
+    totalCourseStock?: number;
+  } | null>(null);
 
   const allTimeOptions = useMemo(() => {
     const merged = [...defaultPresetTimes];
@@ -126,7 +137,7 @@ export default function AddMedicationScreen() {
   const handleSelectCatalogMedicine = (med: CatalogMedicine) => {
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
+    } catch { }
     setName(med.name);
     if (med.image) {
       setPhotoUri(med.image);
@@ -187,7 +198,7 @@ export default function AddMedicationScreen() {
   const toggleTime = (time: string) => {
     try {
       Haptics.selectionAsync();
-    } catch {}
+    } catch { }
 
     if (selectedTimes.includes(time)) {
       setSelectedTimes((prev) => prev.filter((t) => t !== time));
@@ -204,7 +215,7 @@ export default function AddMedicationScreen() {
 
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
+    } catch { }
 
     setCustomTimeOptions((prev) => (prev.includes(timeStr) ? prev : [...prev, timeStr]));
     setSelectedTimes((prev) => (prev.includes(timeStr) ? prev : [...prev, timeStr]));
@@ -214,7 +225,7 @@ export default function AddMedicationScreen() {
   const selectDuration = (months: number, days: number) => {
     try {
       Haptics.selectionAsync();
-    } catch {}
+    } catch { }
     setSelectedMonths(months);
     setTotalCourseStock(days.toString());
   };
@@ -238,7 +249,7 @@ export default function AddMedicationScreen() {
 
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
+    } catch { }
 
     addMedication({
       name: name.trim(),
@@ -253,13 +264,23 @@ export default function AddMedicationScreen() {
       selectedTimes,
     });
 
-    Alert.alert(
-      'Thành công',
-      `Đã thêm "${name.trim()}" vào tủ thuốc và đặt lịch nhắc.\nHiện có: ${currentNum} viên ${
-        treatmentType === 'course' ? `(Cả liệu trình: ${totalNum} viên)` : ''
-      }.`,
-      [{ text: 'Xong', onPress: () => router.back() }]
-    );
+    setSuccessSummary({
+      name: name.trim(),
+      image: photoUri,
+      times: [...selectedTimes],
+      stock: currentNum,
+      totalCourseStock: treatmentType === 'course' ? totalNum : undefined,
+    });
+  };
+
+  const handleResetForAnother = () => {
+    setSuccessSummary(null);
+    setName('');
+    setDosage('');
+    setNotes('');
+    setPhotoUri(null);
+    setSelectedTimes([]);
+    setCatalogQuery('');
   };
 
   return (
@@ -471,14 +492,12 @@ export default function AddMedicationScreen() {
           <View className="flex-row bg-muted/60 p-1 rounded-2xl mb-4">
             <TouchableOpacity
               onPress={() => setTreatmentType('course')}
-              className={`flex-1 py-2.5 rounded-xl items-center ${
-                treatmentType === 'course' ? 'bg-card' : ''
-              }`}
+              className={`flex-1 py-2.5 rounded-xl items-center ${treatmentType === 'course' ? 'bg-card' : ''
+                }`}
             >
               <Text
-                className={`text-sm font-semibold ${
-                  treatmentType === 'course' ? 'text-primary' : 'text-muted-foreground'
-                }`}
+                className={`text-sm font-semibold ${treatmentType === 'course' ? 'text-primary' : 'text-muted-foreground'
+                  }`}
               >
                 Theo đợt điều trị
               </Text>
@@ -486,14 +505,12 @@ export default function AddMedicationScreen() {
 
             <TouchableOpacity
               onPress={() => setTreatmentType('ongoing')}
-              className={`flex-1 py-2.5 rounded-xl items-center ${
-                treatmentType === 'ongoing' ? 'bg-card' : ''
-              }`}
+              className={`flex-1 py-2.5 rounded-xl items-center ${treatmentType === 'ongoing' ? 'bg-card' : ''
+                }`}
             >
               <Text
-                className={`text-sm font-semibold ${
-                  treatmentType === 'ongoing' ? 'text-primary' : 'text-muted-foreground'
-                }`}
+                className={`text-sm font-semibold ${treatmentType === 'ongoing' ? 'text-primary' : 'text-muted-foreground'
+                  }`}
               >
                 Dài hạn (mãn tính)
               </Text>
@@ -512,15 +529,13 @@ export default function AddMedicationScreen() {
                     <TouchableOpacity
                       key={dur.months}
                       onPress={() => selectDuration(dur.months, dur.days)}
-                      className={`px-3 py-2 rounded-xl border flex-row items-center ${
-                        isSelected ? 'bg-primary/10 border-primary' : 'bg-card border-border'
-                      }`}
+                      className={`px-3 py-2 rounded-xl border flex-row items-center ${isSelected ? 'bg-primary/10 border-primary' : 'bg-card border-border'
+                        }`}
                     >
                       {isSelected && <Check size={14} color="#0D9488" className="mr-1" />}
                       <Text
-                        className={`text-xs font-semibold ${
-                          isSelected ? 'text-primary' : 'text-foreground'
-                        }`}
+                        className={`text-xs font-semibold ${isSelected ? 'text-primary' : 'text-foreground'
+                          }`}
                       >
                         {dur.label}
                       </Text>
@@ -737,53 +752,13 @@ export default function AddMedicationScreen() {
               </TouchableOpacity>
             </View>
 
-            <View className="flex-row items-center justify-center my-6 gap-4">
-              {/* Cột Giờ */}
-              <View className="items-center">
-                <TouchableOpacity
-                  onPress={() => setCustomHour((h) => (h + 1) % 24)}
-                  className="h-10 w-16 rounded-xl bg-muted/70 items-center justify-center mb-2"
-                >
-                  <Text className="text-lg font-bold text-foreground">+</Text>
-                </TouchableOpacity>
-                <View className="h-16 w-20 rounded-2xl bg-primary/10 border border-primary/30 items-center justify-center">
-                  <Text className="text-3xl font-extrabold text-primary">
-                    {String(customHour).padStart(2, '0')}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setCustomHour((h) => (h - 1 + 24) % 24)}
-                  className="h-10 w-16 rounded-xl bg-muted/70 items-center justify-center mt-2"
-                >
-                  <Text className="text-lg font-bold text-foreground">-</Text>
-                </TouchableOpacity>
-                <Text className="text-xs text-muted-foreground mt-1">Giờ</Text>
-              </View>
-
-              <Text className="text-3xl font-extrabold text-foreground pb-5">:</Text>
-
-              {/* Cột Phút */}
-              <View className="items-center">
-                <TouchableOpacity
-                  onPress={() => setCustomMinute((m) => (m + 5) % 60)}
-                  className="h-10 w-16 rounded-xl bg-muted/70 items-center justify-center mb-2"
-                >
-                  <Text className="text-lg font-bold text-foreground">+5</Text>
-                </TouchableOpacity>
-                <View className="h-16 w-20 rounded-2xl bg-primary/10 border border-primary/30 items-center justify-center">
-                  <Text className="text-3xl font-extrabold text-primary">
-                    {String(customMinute).padStart(2, '0')}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setCustomMinute((m) => (m - 5 + 60) % 60)}
-                  className="h-10 w-16 rounded-xl bg-muted/70 items-center justify-center mt-2"
-                >
-                  <Text className="text-lg font-bold text-foreground">-5</Text>
-                </TouchableOpacity>
-                <Text className="text-xs text-muted-foreground mt-1">Phút</Text>
-              </View>
-            </View>
+            {/* Bộ chọn giờ dạng con lăn vuốt cuộn bằng tay */}
+            <WheelTimePicker
+              hour={customHour}
+              minute={customMinute}
+              onChangeHour={setCustomHour}
+              onChangeMinute={setCustomMinute}
+            />
 
             {/* Chọn nhanh phút 00, 15, 30, 45 */}
             <View className="flex-row gap-2 mb-5">
@@ -831,6 +806,142 @@ export default function AddMedicationScreen() {
               </Button>
             </View>
           </Card>
+        </View>
+      </Modal>
+
+      {/* MODAL THÔNG BÁO THÊM THUỐC THÀNH CÔNG ĐẸP MẮT */}
+      <Modal
+        visible={!!successSummary}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setSuccessSummary(null);
+          router.back();
+        }}
+      >
+        <View className="flex-1 bg-black/55 justify-center items-center px-6">
+          <View
+            className="w-full max-w-sm bg-card border border-border/80 px-5 pt-6 pb-5 items-center"
+            style={{ borderRadius: 28 }}
+          >
+            {/* Vòng tròn xanh ngọc xác nhận thành công */}
+            <View
+              style={{
+                width: 68,
+                height: 68,
+                borderRadius: 34,
+                backgroundColor: 'rgba(13, 148, 136, 0.14)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 14,
+              }}
+            >
+              <View
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: 25,
+                  backgroundColor: '#0D9488',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <CheckCircle2 size={28} color="#FFFFFF" strokeWidth={2.4} />
+              </View>
+            </View>
+
+            <Text className="text-xl font-extrabold text-foreground text-center">
+              Đã thêm vào tủ thuốc!
+            </Text>
+            <Text className="text-xs text-muted-foreground text-center mt-1 mb-4">
+              Lịch nhắc uống thuốc đã được lưu an toàn trên máy
+            </Text>
+
+            {/* Thẻ tóm tắt thuốc vừa thêm */}
+            {successSummary && (
+              <View className="w-full rounded-2xl bg-muted/45 border border-border/60 p-3.5 mb-5">
+                <View className="flex-row items-center">
+                  {successSummary.image ? (
+                    <Image
+                      source={{ uri: successSummary.image }}
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 12,
+                        backgroundColor: '#FFFFFF',
+                      }}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View className="h-12 w-12 rounded-xl bg-primary/12 items-center justify-center">
+                      <Pill size={22} color="#0D9488" />
+                    </View>
+                  )}
+                  <View className="ml-3 flex-1">
+                    <Text className="text-sm font-bold text-foreground leading-snug">
+                      {successSummary.name}
+                    </Text>
+                    <Text className="text-xs text-muted-foreground mt-0.5">
+                      Hiện có: {successSummary.stock} viên
+                      {successSummary.totalCourseStock
+                        ? ` • Cả liệu trình ${successSummary.totalCourseStock} viên`
+                        : ''}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Nhãn các khung giờ nhắc */}
+                <View className="flex-row flex-wrap gap-1.5 mt-3 pt-2.5 border-t border-border/50">
+                  {successSummary.times.map((t) => (
+                    <View
+                      key={t}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(13, 148, 136, 0.12)',
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 999,
+                      }}
+                    >
+                      <Clock size={12} color="#0D9488" />
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '700',
+                          color: '#0D9488',
+                          marginLeft: 5,
+                        }}
+                      >
+                        {t}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <Button
+              variant="default"
+              className="w-full h-12 rounded-2xl bg-primary"
+              onPress={() => {
+                setSuccessSummary(null);
+                router.back();
+              }}
+            >
+              <Text className="text-base font-bold text-white">Hoàn tất</Text>
+            </Button>
+
+            <TouchableOpacity
+              onPress={handleResetForAnother}
+              className="mt-3 py-1.5 px-3"
+              activeOpacity={0.7}
+            >
+              <Text className="text-xs font-semibold text-primary">
+                + Thêm một thuốc khác
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>

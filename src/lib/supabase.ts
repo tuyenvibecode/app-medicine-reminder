@@ -1,3 +1,4 @@
+// Mục đích: Khởi tạo Supabase client duy nhất dùng SecureStore và tự làm mới phiên theo AppState.
 // src/lib/supabase.ts
 // Khởi tạo Supabase Client duy nhất cho toàn ứng dụng
 // Sử dụng SecureStore bảo mật và quản lý autoRefresh theo vòng đời AppState

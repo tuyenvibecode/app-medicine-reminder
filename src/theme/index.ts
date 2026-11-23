@@ -1,3 +1,4 @@
+// Mục đích: Định nghĩa bảng màu sáng/tối và token giao diện dùng chung cho toàn ứng dụng.
 // src/theme/index.ts
 // Bảng màu & tokens theo phong cách shadcn (React Native Reusables)
 // Tông màu chủ đạo: Teal (xanh ngọc dịu mắt, đáng tin cậy, y tế hiện đại)

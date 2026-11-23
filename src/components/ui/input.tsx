@@ -1,3 +1,4 @@
+// Mục đích: Component ô nhập liệu (Input) dùng chung theo phong cách React Native Reusables.
 // src/components/ui/input.tsx
 // Ô nhập liệu kiểu shadcn (React Native Reusables)
 

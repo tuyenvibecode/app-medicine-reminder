@@ -1,3 +1,4 @@
+// Mục đích: Root layout khởi tạo theme, QueryClient, AppProvider, SecurityGate và stack điều hướng.
 // app/_layout.tsx
 // Root layout của ứng dụng Nhắc nhở uống thuốc
 
@@ -13,6 +14,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { setupNotificationChannels } from '@/lib/notifications';
 import { AppProvider } from '@/context/AppContext';
 import { SecurityGate } from '@/components/SecurityGate';
+import { ReminderNotificationListener } from '@/components/ReminderNotificationListener';
+import { AppDialogHost } from '@/components/ui/app-dialog';
 import { NAV_THEME } from '@/theme';
 
 // Ngăn màn hình splash tự biến mất trước khi load xong tài nguyên
@@ -57,6 +60,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <AppProvider>
         <ThemeProvider value={navigationTheme}>
+          <ReminderNotificationListener />
           <SecurityGate>
             <View style={{ flex: 1 }} className="flex-1 bg-background">
               <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -100,8 +104,17 @@ export default function RootLayout() {
                     headerShown: false,
                   }}
                 />
+                <Stack.Screen
+                  name="reminder/alarm"
+                  options={{
+                    presentation: 'fullScreenModal',
+                    headerShown: false,
+                    gestureEnabled: false,
+                  }}
+                />
               </Stack>
               <PortalHost />
+              <AppDialogHost />
             </View>
           </SecurityGate>
         </ThemeProvider>

@@ -1,3 +1,4 @@
+// Mục đích: Component thẻ liều thuốc trong ngày kèm ảnh viên thuốc và nút xác nhận đã uống.
 // src/components/DoseCard.tsx
 // Thẻ liều thuốc trong ngày: Nút "Đã uống" to rõ 1-chạm, ảnh viên thuốc chủ đạo
 
@@ -102,7 +103,7 @@ export function DoseCard({ item, onTake, onSnooze, onUndoTake }: DoseCardProps) 
             <View className="flex-row items-center justify-center">
               <Check size={18} color="#FFFFFF" strokeWidth={2.5} />
               <Text className="text-primary-foreground font-semibold text-base ml-1.5">
-                Đã uống
+                Xác nhận uống
               </Text>
             </View>
           </Button>

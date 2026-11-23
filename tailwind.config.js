@@ -1,3 +1,4 @@
+// Mục đích: Cấu hình Tailwind CSS và bảng màu giao diện NativeWind cho app.
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: 'class',

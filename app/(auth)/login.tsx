@@ -1,3 +1,4 @@
+// Mục đích: Màn hình đăng nhập gia đình bằng mã mời hoặc tài khoản quản trị Supabase.
 // app/(auth)/login.tsx
 // Màn hình Đăng nhập riêng cho thành viên gia đình
 // Hỗ trợ cả 2 phương thức: Đăng nhập bằng Mã mời gia đình (1-chạm) & Tài khoản quản trị
@@ -8,7 +9,6 @@ import {
   Text,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { Shield, X, Mail, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
+import { AppAlert as Alert } from '@/components/ui/app-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';

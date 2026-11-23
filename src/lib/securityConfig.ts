@@ -1,3 +1,4 @@
+// Mục đích: Lưu và đọc tuỳ chọn bảo mật và cấu hình giờ nhắc bằng SecureStore trên thiết bị.
 // src/lib/securityConfig.ts
 // Lưu và đọc cấu hình bảo mật (Khoá vân tay, Che màn hình đa nhiệm) bằng SecureStore (Keystore Android)
 // Tuân thủ rule 01-security.md: không dùng AsyncStorage cho dữ liệu bảo mật.

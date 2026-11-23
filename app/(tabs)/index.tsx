@@ -1,3 +1,4 @@
+// Mục đích: Màn hình chính Hôm nay hiển thị lịch tuần vuốt ngang và các cữ uống thuốc theo buổi.
 // app/(tabs)/index.tsx
 // Màn hình chính "Hôm nay"
 // Thanh Lịch hiển thị đúng 1 Tuần (7 ngày T2 -> CN vừa khít màn hình) và có Swiper phân trang (Paging):
@@ -8,7 +9,6 @@ import {
   View,
   Text,
   ScrollView,
-  Alert,
   TouchableOpacity,
   Dimensions,
   type NativeSyntheticEvent,
@@ -26,6 +26,8 @@ import {
   CalendarCheck,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   RotateCcw,
 } from 'lucide-react-native';
 import {
@@ -39,6 +41,7 @@ import * as Haptics from 'expo-haptics';
 import { DoseCard } from '@/components/DoseCard';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { AppAlert as Alert } from '@/components/ui/app-dialog';
 import { useAppStore } from '@/context/AppContext';
 import type { DoseTimelineItem } from '@/types';
 
@@ -194,20 +197,26 @@ export default function TodayScreen() {
     );
   };
 
+  const [showTakenSection, setShowTakenSection] = useState(false);
+
   const activeDateDoses = getDosesForDate(selectedDate);
   const sortedDoses = useMemo(
     () => [...activeDateDoses].sort((a, b) => a.scheduledTime.localeCompare(b.scheduledTime)),
     [activeDateDoses]
   );
 
-  const takenCount = sortedDoses.filter((d) => d.status === 'taken').length;
+  const pendingDoses = sortedDoses.filter((d) => d.status !== 'taken');
+  const takenDoses = sortedDoses.filter((d) => d.status === 'taken');
+
+  const takenCount = takenDoses.length;
   const totalCount = sortedDoses.length;
   const progressPercent = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 0;
 
-  const morningDoses = sortedDoses.filter((d) => d.timeGroup === 'morning');
-  const noonDoses = sortedDoses.filter((d) => d.timeGroup === 'noon');
-  const afternoonDoses = sortedDoses.filter((d) => d.timeGroup === 'afternoon');
-  const eveningDoses = sortedDoses.filter((d) => d.timeGroup === 'evening');
+  // Chỉ hiển thị các cữ CHƯA UỐNG ở các nhóm Sáng / Trưa / Chiều / Tối cho gọn mắt
+  const morningDoses = pendingDoses.filter((d) => d.timeGroup === 'morning');
+  const noonDoses = pendingDoses.filter((d) => d.timeGroup === 'noon');
+  const afternoonDoses = pendingDoses.filter((d) => d.timeGroup === 'afternoon');
+  const eveningDoses = pendingDoses.filter((d) => d.timeGroup === 'evening');
 
   const currentWeekPage = weeksPages[activeWeekIndex] || weeksPages[TODAY_WEEK_INDEX];
   const isViewingToday = isSameDay(selectedDate, new Date());
@@ -584,6 +593,61 @@ export default function TodayScreen() {
                 onUndoTake={handleUndoTakeDose}
               />
             ))}
+          </View>
+        )}
+
+        {/* 5. Mục thu gọn: Các cữ đã uống (giúp danh sách trên gọn gàng, bấm vào để xem lại hoặc Hoàn tác) */}
+        {takenDoses.length > 0 && (
+          <View className="mt-2 mb-4">
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => {
+                try {
+                  Haptics.selectionAsync();
+                } catch {}
+                setShowTakenSection((prev) => !prev);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: 'rgba(16, 185, 129, 0.09)',
+                borderWidth: 1,
+                borderColor: 'rgba(16, 185, 129, 0.25)',
+                borderRadius: 16,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                marginBottom: showTakenSection ? 12 : 0,
+              }}
+            >
+              <View className="flex-row items-center">
+                <CheckCircle2 size={18} color="#10B981" />
+                <Text className="text-sm font-bold text-emerald-700 dark:text-emerald-300 ml-2">
+                  Đã uống {isViewingToday ? 'hôm nay' : format(selectedDate, 'dd/MM')} ({takenDoses.length})
+                </Text>
+              </View>
+              <View className="flex-row items-center">
+                <Text className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mr-1">
+                  {showTakenSection ? 'Thu gọn' : 'Xem lại'}
+                </Text>
+                {showTakenSection ? (
+                  <ChevronUp size={16} color="#10B981" />
+                ) : (
+                  <ChevronDown size={16} color="#10B981" />
+                )}
+              </View>
+            </TouchableOpacity>
+
+            {showTakenSection &&
+              takenDoses.map((dose) => (
+                <DoseCard
+                  key={dose.id}
+                  item={dose}
+                  onTake={handleTakeDose}
+                  onSnooze={handleSnoozeDose}
+                  onUndoTake={handleUndoTakeDose}
+                />
+              ))}
           </View>
         )}
       </ScrollView>
