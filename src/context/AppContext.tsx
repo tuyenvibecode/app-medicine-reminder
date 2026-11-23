@@ -4,7 +4,11 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { format, subDays } from 'date-fns';
-import { scheduleDailyReminder, scheduleSnoozeNotification } from '@/lib/notifications';
+import {
+  scheduleDailyReminder,
+  scheduleSnoozeNotification,
+  rescheduleAllDailyReminders,
+} from '@/lib/notifications';
 import { loadReminderSettings, saveReminderSettings } from '@/lib/securityConfig';
 import type {
   Medication,
@@ -474,16 +478,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Hẹn nhắc lại sau 15 phút qua thông báo hệ thống (tôn trọng cấu hình ẩn tên thuốc màn hình khoá)
+  // Hẹn nhắc lại sau 15 phút qua thông báo hệ thống (tôn trọng cấu hình ẩn tên thuốc & nhạc chuông)
   const snoozeDose = useCallback(
     (item: DoseTimelineItem) => {
       scheduleSnoozeNotification(
         item.medicationName,
         item.dosage,
-        reminderSettings.hideDetailsOnLock
+        reminderSettings.hideDetailsOnLock,
+        reminderSettings.ringtoneId
       ).catch(() => {});
     },
-    [reminderSettings.hideDetailsOnLock]
+    [reminderSettings.hideDetailsOnLock, reminderSettings.ringtoneId]
   );
 
   // Nạp thêm số lượng viên vào tủ thuốc và đồng bộ với lịch hôm nay
@@ -546,7 +551,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         cleanDosage,
         hour,
         minute,
-        reminderSettings.hideDetailsOnLock
+        reminderSettings.hideDetailsOnLock,
+        reminderSettings.ringtoneId
       ).catch(() => {});
 
       return {
@@ -569,7 +575,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
 
     setDoses((prev) => [...prev, ...newDoses]);
-  }, [reminderSettings.hideDetailsOnLock]);
+  }, [reminderSettings.hideDetailsOnLock, reminderSettings.ringtoneId]);
 
   // Đồng bộ toàn bộ thuốc từ Phiếu đơn thuốc vào Tủ thuốc và Lịch nhắc hôm nay
   const syncPrescriptionToReminders = useCallback(
@@ -626,7 +632,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             item.dosageInstruction,
             parseInt(hStr || '8', 10),
             parseInt(mStr || '0', 10),
-            reminderSettings.hideDetailsOnLock
+            reminderSettings.hideDetailsOnLock,
+            reminderSettings.ringtoneId
           ).catch(() => {});
 
           addedDoses.push({
@@ -670,13 +677,63 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setDoctorPrescriptions((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
-  const updateReminderSettings = useCallback((patch: Partial<ReminderSettings>) => {
-    setReminderSettings((prev) => {
-      const next = { ...prev, ...patch };
-      saveReminderSettings(next).catch(() => {});
-      return next;
-    });
-  }, []);
+  // Cập nhật cấu hình giờ nhắc / nhạc chuông:
+  // - Lưu vĩnh viễn vào SecureStore
+  // - Tự động đồng bộ giờ mới vào các liều trong ngày (Hôm nay) tương ứng buổi Sáng/Trưa/Chiều/Tối
+  // - Tự động đặt lại toàn bộ báo thức hệ thống Android theo giờ & kênh nhạc chuông mới
+  const updateReminderSettings = useCallback(
+    (patch: Partial<ReminderSettings>) => {
+      setReminderSettings((prev) => {
+        const next = { ...prev, ...patch };
+        saveReminderSettings(next).catch(() => {});
+
+        // Nếu người dùng đổi giờ mặc định của buổi nào thì cập nhật giờ các liều thuộc buổi đó luôn
+        let updatedDosesList = doses;
+        if (
+          patch.morningTime ||
+          patch.noonTime ||
+          patch.afternoonTime ||
+          patch.eveningTime
+        ) {
+          updatedDosesList = doses.map((d) => {
+            if (patch.morningTime && d.timeGroup === 'morning') {
+              return { ...d, scheduledTime: patch.morningTime };
+            }
+            if (patch.noonTime && d.timeGroup === 'noon') {
+              return { ...d, scheduledTime: patch.noonTime };
+            }
+            if (patch.afternoonTime && d.timeGroup === 'afternoon') {
+              return { ...d, scheduledTime: patch.afternoonTime };
+            }
+            if (patch.eveningTime && d.timeGroup === 'evening') {
+              return { ...d, scheduledTime: patch.eveningTime };
+            }
+            return d;
+          });
+          setDoses(updatedDosesList);
+        }
+
+        // Đặt lại toàn bộ thông báo local Android với giờ và kênh nhạc chuông mới
+        if (
+          patch.morningTime ||
+          patch.noonTime ||
+          patch.afternoonTime ||
+          patch.eveningTime ||
+          patch.ringtoneId ||
+          patch.hideDetailsOnLock !== undefined
+        ) {
+          rescheduleAllDailyReminders(
+            updatedDosesList,
+            next.ringtoneId,
+            next.hideDetailsOnLock
+          ).catch(() => {});
+        }
+
+        return next;
+      });
+    },
+    [doses]
+  );
 
   return (
     <AppContext.Provider

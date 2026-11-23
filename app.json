@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.ahxian.nhacnhouongthuoc",
-      "versionCode": 3,
+      "versionCode": 4,
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#F0FDFA",

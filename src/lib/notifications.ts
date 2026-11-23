@@ -1,6 +1,6 @@
 // src/lib/notifications.ts
 // Quản lý thông báo local nhắc uống thuốc bằng expo-notifications
-// Tuân thủ skill medication-reminders: chạy local độc lập mạng
+// Hỗ trợ 4 kênh thông báo Android riêng biệt tương ứng 4 kiểu Nhạc chuông / Rung (vì Android 8+ khoá âm thanh theo từng channel)
 
 import {
   setNotificationHandler,
@@ -9,16 +9,30 @@ import {
   getPermissionsAsync,
   requestPermissionsAsync,
   scheduleNotificationAsync,
+  cancelAllScheduledNotificationsAsync,
   AndroidImportance,
   AndroidNotificationVisibility,
   SchedulableTriggerInputTypes,
 } from 'expo-notifications';
-import { Platform } from 'react-native';
+import { Platform, Vibration } from 'react-native';
+import type { DoseTimelineItem, ReminderSettings } from '@/types';
 
-export const MEDICATION_CHANNEL_ID = 'medication-reminders-high';
+export type RingtoneId = ReminderSettings['ringtoneId'];
+
+export const CHANNEL_IDS: Record<RingtoneId, string> = {
+  default: 'medication-reminders-default-v2',
+  gentle: 'medication-reminders-gentle-v2',
+  loud_alarm: 'medication-reminders-loud-v2',
+  vibrate_only: 'medication-reminders-vibrate-v2',
+};
+
 export const ACTION_TAKEN = 'ACTION_TAKEN';
 export const ACTION_SNOOZE = 'ACTION_SNOOZE';
 export const CATEGORY_MEDICATION_REMINDER = 'CATEGORY_MEDICATION_REMINDER';
+
+export function getChannelIdForRingtone(ringtoneId: RingtoneId = 'default'): string {
+  return CHANNEL_IDS[ringtoneId] || CHANNEL_IDS.default;
+}
 
 // Cấu hình cách thông báo hiển thị khi app đang mở
 try {
@@ -34,23 +48,64 @@ try {
 } catch {}
 
 /**
- * Khởi tạo kênh thông báo ưu tiên cao (Android) và danh mục hành động (Đã uống / Nhắc lại)
- * Bọc try-catch để chạy an toàn trên cả Expo Go lẫn bản APK độc lập.
+ * Khởi tạo cả 4 kênh thông báo Android (Tiêu chuẩn / Nhẹ nhàng / Báo thức lớn / Chỉ rung)
+ * và danh mục hành động nhanh (Đã uống / Nhắc lại sau 15 phút).
  */
 export async function setupNotificationChannels(): Promise<void> {
   try {
     if (Platform.OS === 'android') {
-      await setNotificationChannelAsync(MEDICATION_CHANNEL_ID, {
-        name: 'Nhắc uống thuốc',
-        description: 'Thông báo báo thức nhắc uống thuốc đúng giờ',
+      // 1. Chuông báo tiêu chuẩn
+      await setNotificationChannelAsync(CHANNEL_IDS.default, {
+        name: 'Nhắc thuốc - Tiêu chuẩn',
+        description: 'Âm thanh mặc định kết hợp rung 2 nhịp rõ ràng',
         importance: AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
+        vibrationPattern: [0, 300, 200, 300],
         lightColor: '#0D9488',
         sound: 'default',
         enableVibrate: true,
         enableLights: true,
         lockscreenVisibility: AndroidNotificationVisibility.PUBLIC,
         bypassDnd: true,
+      });
+
+      // 2. Âm báo nhẹ nhàng
+      await setNotificationChannelAsync(CHANNEL_IDS.gentle, {
+        name: 'Nhắc thuốc - Nhẹ nhàng',
+        description: 'Âm báo dịu tai kèm rung nhẹ 1 nhịp',
+        importance: AndroidImportance.DEFAULT,
+        vibrationPattern: [0, 150],
+        lightColor: '#0D9488',
+        sound: 'default',
+        enableVibrate: true,
+        enableLights: true,
+        lockscreenVisibility: AndroidNotificationVisibility.PUBLIC,
+      });
+
+      // 3. Chuông báo thức lớn (cho ông bà)
+      await setNotificationChannelAsync(CHANNEL_IDS.loud_alarm, {
+        name: 'Nhắc thuốc - Báo thức lớn',
+        description: 'Ưu tiên mức tối đa (MAX) và rung liên tục 3 nhịp dài',
+        importance: AndroidImportance.MAX,
+        vibrationPattern: [0, 500, 200, 500, 200, 500],
+        lightColor: '#0D9488',
+        sound: 'default',
+        enableVibrate: true,
+        enableLights: true,
+        lockscreenVisibility: AndroidNotificationVisibility.PUBLIC,
+        bypassDnd: true,
+      });
+
+      // 4. Chỉ rung (im lặng)
+      await setNotificationChannelAsync(CHANNEL_IDS.vibrate_only, {
+        name: 'Nhắc thuốc - Chỉ rung',
+        description: 'Chỉ rung thiết bị, không phát tiếng chuông',
+        importance: AndroidImportance.HIGH,
+        vibrationPattern: [0, 400, 200, 400],
+        lightColor: '#0D9488',
+        sound: null,
+        enableVibrate: true,
+        enableLights: true,
+        lockscreenVisibility: AndroidNotificationVisibility.PUBLIC,
       });
     }
 
@@ -71,7 +126,7 @@ export async function setupNotificationChannels(): Promise<void> {
       },
     ]);
   } catch {
-    // Bỏ qua lỗi trên Expo Go (do Expo Go bị hạn chế với một số API notifications)
+    // Bỏ qua lỗi trên Expo Go nếu API bị hạn chế
   }
 }
 
@@ -95,29 +150,75 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 /**
+ * Phát thử ngay thông báo nhắc thuốc thật theo đúng kênh Nhạc chuông / Rung đã chọn
+ */
+export async function sendTestReminderNotification(
+  ringtoneId: RingtoneId,
+  ringtoneName: string
+): Promise<boolean> {
+  try {
+    // Rung phản hồi ngay lập tức theo đúng kiểu đã chọn
+    if (Platform.OS !== 'web') {
+      if (ringtoneId === 'loud_alarm') {
+        Vibration.vibrate([0, 400, 150, 400, 150, 400]);
+      } else if (ringtoneId === 'gentle') {
+        Vibration.vibrate(150);
+      } else {
+        Vibration.vibrate([0, 250, 150, 250]);
+      }
+    }
+
+    await setupNotificationChannels();
+    const granted = await requestNotificationPermissions();
+    if (!granted) return false;
+
+    const channelId = getChannelIdForRingtone(ringtoneId);
+
+    await scheduleNotificationAsync({
+      content: {
+        title: '🔔 Thử chuông nhắc uống thuốc',
+        body: `Đang áp dụng: ${ringtoneName}. Đã đến giờ uống thuốc của bạn!`,
+        categoryIdentifier: CATEGORY_MEDICATION_REMINDER,
+        sound: ringtoneId === 'vibrate_only' ? false : 'default',
+      },
+      trigger: {
+        type: SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 1,
+        channelId: Platform.OS === 'android' ? channelId : undefined,
+      },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Đặt lịch thông báo nhắc lại sau 15 phút (Snooze)
- * Hỗ trợ ẩn tên thuốc trên màn hình khoá khi người dùng bật chế độ riêng tư.
  */
 export async function scheduleSnoozeNotification(
   medicationName: string,
   dosage: string,
-  hideDetails = false
+  hideDetails = false,
+  ringtoneId: RingtoneId = 'default'
 ): Promise<string | null> {
   try {
     const granted = await requestNotificationPermissions();
     if (!granted) return null;
+
+    const channelId = getChannelIdForRingtone(ringtoneId);
 
     return await scheduleNotificationAsync({
       content: {
         title: hideDetails ? 'Đến giờ uống thuốc' : `Đến giờ uống thuốc: ${medicationName}`,
         body: hideDetails ? 'Mở ứng dụng để xem chi tiết liều thuốc của bạn' : `Liều lượng: ${dosage}`,
         categoryIdentifier: CATEGORY_MEDICATION_REMINDER,
-        sound: 'default',
+        sound: ringtoneId === 'vibrate_only' ? false : 'default',
       },
       trigger: {
         type: SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: 15 * 60,
-        channelId: Platform.OS === 'android' ? MEDICATION_CHANNEL_ID : undefined,
+        channelId: Platform.OS === 'android' ? channelId : undefined,
       },
     });
   } catch {
@@ -126,19 +227,21 @@ export async function scheduleSnoozeNotification(
 }
 
 /**
- * Đặt lịch nhắc uống thuốc hàng ngày theo giờ:phút
- * Hỗ trợ ẩn tên thuốc trên màn hình khoá khi bật chế độ riêng tư.
+ * Đặt lịch nhắc uống thuốc hàng ngày theo giờ:phút và đúng kênh nhạc chuông
  */
 export async function scheduleDailyReminder(
   medicationName: string,
   dosage: string,
   hour: number,
   minute: number,
-  hideDetails = false
+  hideDetails = false,
+  ringtoneId: RingtoneId = 'default'
 ): Promise<string | null> {
   try {
     const granted = await requestNotificationPermissions();
     if (!granted) return null;
+
+    const channelId = getChannelIdForRingtone(ringtoneId);
 
     return await scheduleNotificationAsync({
       content: {
@@ -147,16 +250,51 @@ export async function scheduleDailyReminder(
           ? 'Mở ứng dụng để xem chi tiết liều thuốc của bạn'
           : dosage || 'Đã đến giờ uống thuốc của bạn',
         categoryIdentifier: CATEGORY_MEDICATION_REMINDER,
-        sound: 'default',
+        sound: ringtoneId === 'vibrate_only' ? false : 'default',
       },
       trigger: {
         type: SchedulableTriggerInputTypes.DAILY,
         hour,
         minute,
-        channelId: Platform.OS === 'android' ? MEDICATION_CHANNEL_ID : undefined,
+        channelId: Platform.OS === 'android' ? channelId : undefined,
       },
     });
   } catch {
     return null;
+  }
+}
+
+/**
+ * Huỷ các báo thức cũ và đặt lại toàn bộ lịch nhắc hàng ngày theo giờ & nhạc chuông mới
+ */
+export async function rescheduleAllDailyReminders(
+  doses: DoseTimelineItem[],
+  ringtoneId: RingtoneId,
+  hideDetails: boolean
+): Promise<void> {
+  try {
+    await setupNotificationChannels();
+    const granted = await requestNotificationPermissions();
+    if (!granted) return;
+
+    await cancelAllScheduledNotificationsAsync();
+
+    for (const dose of doses) {
+      const [hStr, mStr] = dose.scheduledTime.split(':');
+      const hour = parseInt(hStr || '8', 10);
+      const minute = parseInt(mStr || '0', 10);
+      if (isNaN(hour) || isNaN(minute)) continue;
+
+      await scheduleDailyReminder(
+        dose.medicationName,
+        dose.dosage,
+        hour,
+        minute,
+        hideDetails,
+        ringtoneId
+      );
+    }
+  } catch {
+    // Bỏ qua nếu đang chạy trên web hoặc môi trường không hỗ trợ
   }
 }

@@ -30,7 +30,7 @@ function CustomFloatingTabBar({ state, navigateToTab, navigation }: CustomTabBar
   const handleNavigate = (routeName: string) => {
     try {
       Haptics.selectionAsync();
-    } catch {}
+    } catch { }
 
     const targetRoute = state.routes.find((r) => r.name === routeName);
     if (targetRoute && typeof navigateToTab === 'function') {
@@ -47,7 +47,7 @@ function CustomFloatingTabBar({ state, navigateToTab, navigation }: CustomTabBar
   const handleQuickCameraCapture = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {}
+    } catch { }
     router.push('/doctor-prescriptions?autoCapture=1' as any);
   };
 
@@ -178,7 +178,6 @@ export default function TabLayout() {
       <Tabs.Screen name="prescription" options={{ title: 'Phiếu note' }} />
       <Tabs.Screen name="account" options={{ title: 'Tài khoản' }} />
       <Tabs.Screen name="history" options={{ href: null }} />
-      <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );
 }
