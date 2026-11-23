@@ -20,10 +20,10 @@ import type { DoseTimelineItem, ReminderSettings } from '@/types';
 export type RingtoneId = ReminderSettings['ringtoneId'];
 
 export const CHANNEL_IDS: Record<RingtoneId, string> = {
-  default: 'medication-reminders-default-v2',
-  gentle: 'medication-reminders-gentle-v2',
-  loud_alarm: 'medication-reminders-loud-v2',
-  vibrate_only: 'medication-reminders-vibrate-v2',
+  default: 'medication-reminders-default-v3',
+  gentle: 'medication-reminders-gentle-v3',
+  loud_alarm: 'medication-reminders-loud-v3',
+  vibrate_only: 'medication-reminders-vibrate-v3',
 };
 
 export const ACTION_TAKEN = 'ACTION_TAKEN';
@@ -32,6 +32,23 @@ export const CATEGORY_MEDICATION_REMINDER = 'CATEGORY_MEDICATION_REMINDER';
 
 export function getChannelIdForRingtone(ringtoneId: RingtoneId = 'default'): string {
   return CHANNEL_IDS[ringtoneId] || CHANNEL_IDS.default;
+}
+
+/**
+ * Trả về tên file nhạc chuông thật tương ứng với từng kiểu âm báo
+ * (Các file WAV được đóng gói trong assets/sounds và đăng ký trong app.json)
+ */
+export function getSoundForRingtone(ringtoneId: RingtoneId = 'default'): string | false {
+  switch (ringtoneId) {
+    case 'gentle':
+      return 'reminder_gentle.wav';
+    case 'loud_alarm':
+      return 'reminder_loud.wav';
+    case 'vibrate_only':
+      return false;
+    default:
+      return 'reminder_standard.wav';
+  }
 }
 
 // Cấu hình cách thông báo hiển thị khi app đang mở
@@ -57,11 +74,11 @@ export async function setupNotificationChannels(): Promise<void> {
       // 1. Chuông báo tiêu chuẩn
       await setNotificationChannelAsync(CHANNEL_IDS.default, {
         name: 'Nhắc thuốc - Tiêu chuẩn',
-        description: 'Âm thanh mặc định kết hợp rung 2 nhịp rõ ràng',
+        description: 'Âm thanh chuông tiêu chuẩn kết hợp rung 2 nhịp rõ ràng',
         importance: AndroidImportance.HIGH,
         vibrationPattern: [0, 300, 200, 300],
         lightColor: '#0D9488',
-        sound: 'default',
+        sound: 'reminder_standard.wav',
         enableVibrate: true,
         enableLights: true,
         lockscreenVisibility: AndroidNotificationVisibility.PUBLIC,
@@ -75,7 +92,7 @@ export async function setupNotificationChannels(): Promise<void> {
         importance: AndroidImportance.DEFAULT,
         vibrationPattern: [0, 150],
         lightColor: '#0D9488',
-        sound: 'default',
+        sound: 'reminder_gentle.wav',
         enableVibrate: true,
         enableLights: true,
         lockscreenVisibility: AndroidNotificationVisibility.PUBLIC,
@@ -88,7 +105,7 @@ export async function setupNotificationChannels(): Promise<void> {
         importance: AndroidImportance.MAX,
         vibrationPattern: [0, 500, 200, 500, 200, 500],
         lightColor: '#0D9488',
-        sound: 'default',
+        sound: 'reminder_loud.wav',
         enableVibrate: true,
         enableLights: true,
         lockscreenVisibility: AndroidNotificationVisibility.PUBLIC,
@@ -179,7 +196,7 @@ export async function sendTestReminderNotification(
         title: '🔔 Thử chuông nhắc uống thuốc',
         body: `Đang áp dụng: ${ringtoneName}. Đã đến giờ uống thuốc của bạn!`,
         categoryIdentifier: CATEGORY_MEDICATION_REMINDER,
-        sound: ringtoneId === 'vibrate_only' ? false : 'default',
+        sound: getSoundForRingtone(ringtoneId),
       },
       trigger: {
         type: SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -213,7 +230,7 @@ export async function scheduleSnoozeNotification(
         title: hideDetails ? 'Đến giờ uống thuốc' : `Đến giờ uống thuốc: ${medicationName}`,
         body: hideDetails ? 'Mở ứng dụng để xem chi tiết liều thuốc của bạn' : `Liều lượng: ${dosage}`,
         categoryIdentifier: CATEGORY_MEDICATION_REMINDER,
-        sound: ringtoneId === 'vibrate_only' ? false : 'default',
+        sound: getSoundForRingtone(ringtoneId),
       },
       trigger: {
         type: SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -250,7 +267,7 @@ export async function scheduleDailyReminder(
           ? 'Mở ứng dụng để xem chi tiết liều thuốc của bạn'
           : dosage || 'Đã đến giờ uống thuốc của bạn',
         categoryIdentifier: CATEGORY_MEDICATION_REMINDER,
-        sound: ringtoneId === 'vibrate_only' ? false : 'default',
+        sound: getSoundForRingtone(ringtoneId),
       },
       trigger: {
         type: SchedulableTriggerInputTypes.DAILY,

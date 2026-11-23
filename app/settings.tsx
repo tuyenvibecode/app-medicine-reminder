@@ -34,6 +34,7 @@ import {
 } from 'lucide-react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as Haptics from 'expo-haptics';
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/context/AppContext';
@@ -86,8 +87,37 @@ export default function SettingsScreen() {
   const [privacyShieldEnabled, setPrivacyShieldEnabled] = useState(true);
   const [isTestingSound, setIsTestingSound] = useState(false);
 
-  // Tải trạng thái bảo mật và đảm bảo 4 kênh thông báo Android đã được khởi tạo
+  // Nạp sẵn 3 file nhạc chuông thật để phát nghe thử ngay lập tức (hoạt động cả trên Expo Go & APK)
+  const standardPlayer = useAudioPlayer(require('../assets/sounds/reminder_standard.wav'));
+  const gentlePlayer = useAudioPlayer(require('../assets/sounds/reminder_gentle.wav'));
+  const loudPlayer = useAudioPlayer(require('../assets/sounds/reminder_loud.wav'));
+
+  // Hàm phát âm thanh nghe thử tương ứng với từng kiểu chuông
+  const playRingtonePreview = (ringtoneId: ReminderSettings['ringtoneId']) => {
+    try {
+      standardPlayer.pause();
+      gentlePlayer.pause();
+      loudPlayer.pause();
+
+      if (ringtoneId === 'vibrate_only') return;
+
+      const player =
+        ringtoneId === 'gentle'
+          ? gentlePlayer
+          : ringtoneId === 'loud_alarm'
+            ? loudPlayer
+            : standardPlayer;
+
+      player.seekTo(0);
+      player.play();
+    } catch {
+      // Bỏ qua nếu thiết bị không hỗ trợ phát audio
+    }
+  };
+
+  // Tải trạng thái bảo mật, cấu hình âm thanh phát ngay và khởi tạo 4 kênh thông báo Android
   useEffect(() => {
+    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
     setupNotificationChannels().catch(() => {});
     loadSecurityPreferences().then((prefs) => {
       setBiometricsEnabled(prefs.biometricsEnabled);
@@ -126,7 +156,8 @@ export default function SettingsScreen() {
   };
 
   const handleSelectRingtone = (opt: (typeof RINGTONE_OPTIONS)[number]) => {
-    // Rung phản hồi khác nhau theo từng kiểu chuông để người dùng cảm nhận ngay
+    // Phát ngay tiếng chuông thật + rung phản hồi để người dùng nghe phân biệt từng kiểu
+    playRingtonePreview(opt.id);
     try {
       if (Platform.OS !== 'web') {
         if (opt.id === 'loud_alarm') {
@@ -151,19 +182,22 @@ export default function SettingsScreen() {
     if (isTestingSound) return;
     setIsTestingSound(true);
     try {
+      // Phát tiếng chuông thật ngay lập tức qua loa điện thoại
+      playRingtonePreview(reminderSettings.ringtoneId);
+
       const sent = await sendTestReminderNotification(
         reminderSettings.ringtoneId,
         reminderSettings.ringtoneName
       );
       if (sent) {
         Alert.alert(
-          'Đang phát thông báo thử (sau 1 giây)',
-          `Kênh áp dụng: "${reminderSettings.ringtoneName}".\n\nNếu máy đang để chế độ Im lặng/Không làm phiền, hãy bật âm lượng chuông hoặc kiểm tra quyền Thông báo trong Cài đặt Android.`
+          'Đang phát chuông báo thử!',
+          `Kênh áp dụng: "${reminderSettings.ringtoneName}".\n\nNếu chưa nghe thấy tiếng, anh hãy tăng âm lượng Đa phương tiện / Thông báo trên điện thoại nhé.`
         );
       } else {
         Alert.alert(
-          'Chưa cấp quyền thông báo',
-          'Ứng dụng cần quyền Thông báo để phát chuông nhắc thuốc. Anh hãy vào Cài đặt điện thoại -> Ứng dụng -> Nhắc nhở uống thuốc -> Thông báo và bật cho phép.'
+          'Đã phát thử âm thanh (chưa cấp quyền thông báo)',
+          'Để app tự báo khi tắt màn hình, anh hãy vào Cài đặt điện thoại -> Ứng dụng -> Nhắc nhở uống thuốc -> Thông báo và bật cho phép.'
         );
       }
     } finally {
