@@ -116,14 +116,13 @@ export function Button({
 
   return (
     <AnimatedPressable
-      style={animatedStyle}
+      style={[animatedStyle, disabled ? { opacity: 0.5 } : undefined]}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={onPress}
       disabled={disabled}
       className={cn(
         buttonVariants({ variant, size }),
-        disabled && 'opacity-50',
         className
       )}
       {...props}

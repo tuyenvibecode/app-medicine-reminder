@@ -29,6 +29,8 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
+  HeartPulse,
+  FileText,
 } from 'lucide-react-native';
 import {
   startOfWeek,
@@ -489,6 +491,37 @@ export default function TodayScreen() {
               </Text>
             </View>
           )}
+        </Card>
+
+        {/* Lối vào nhanh Quản lý Sức khoẻ (nút to 1-chạm dành cho người lớn tuổi) */}
+        <Card className="mb-5 p-3.5 border-primary/25 bg-card">
+          <View className="flex-row items-center justify-between mb-2.5">
+            <Text className="text-sm font-bold text-foreground">
+              Quản lý Sức khoẻ
+            </Text>
+            <TouchableOpacity onPress={() => router.push('/health' as any)}>
+              <Text className="text-xs font-semibold text-primary">Mở tất cả</Text>
+            </TouchableOpacity>
+          </View>
+          <View className="flex-row gap-2.5">
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.push('/health?tab=omron' as any)}
+              className="flex-1 flex-row items-center justify-center bg-primary/10 border border-primary/25 rounded-2xl py-3 px-2.5"
+            >
+              <HeartPulse size={18} color="#0D9488" />
+              <Text className="text-sm font-bold text-primary ml-2">Đo máy Omron</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.push('/health?tab=visits' as any)}
+              className="flex-1 flex-row items-center justify-center bg-muted/70 border border-border rounded-2xl py-3 px-2.5"
+            >
+              <FileText size={18} color="#0F172A" />
+              <Text className="text-sm font-bold text-foreground ml-2">Lưu giấy khám</Text>
+            </TouchableOpacity>
+          </View>
         </Card>
 
         {/* Trạng thái rỗng nếu chưa có lịch thuốc */}

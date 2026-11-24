@@ -238,11 +238,30 @@ export default function MedicationsScreen() {
           showsVerticalScrollIndicator={false}
         >
           {filtered.length === 0 ? (
-            <View className="items-center justify-center py-12">
+            <View className="items-center justify-center py-12 px-4">
               <Pill size={40} color="#94A3B8" strokeWidth={1.5} />
-              <Text className="text-base text-muted-foreground mt-3">
-                Không tìm thấy loại thuốc nào
+              <Text className="text-base font-semibold text-foreground mt-3 text-center">
+                {search.trim()
+                  ? 'Không tìm thấy thuốc phù hợp'
+                  : activeTab === 'active'
+                    ? 'Tủ thuốc đang trống'
+                    : 'Chưa có thuốc nào đã ngừng'}
               </Text>
+              {!search.trim() && activeTab === 'active' && (
+                <>
+                  <Text className="text-xs text-muted-foreground text-center mt-1 mb-4">
+                    Thêm thuốc bạn đang dùng để theo dõi số viên còn lại và nhận nhắc uống đúng giờ.
+                  </Text>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="bg-primary px-4 rounded-xl"
+                    onPress={() => router.push('/medication/add')}
+                  >
+                    <Text className="text-white font-semibold text-xs">+ Thêm thuốc ngay</Text>
+                  </Button>
+                </>
+              )}
             </View>
           ) : (
             filtered.map((item) => {

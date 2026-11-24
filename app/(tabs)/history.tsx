@@ -2,23 +2,50 @@
 // app/(tabs)/history.tsx
 // Màn hình "Lịch sử" uống thuốc và tỷ lệ tuân thủ
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Flame, CheckCircle, Clock } from 'lucide-react-native';
+import { subDays } from 'date-fns';
+import { Flame, CheckCircle, Clock, ClipboardList } from 'lucide-react-native';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAppStore } from '@/context/AppContext';
 
-export default function HistoryScreen() {
-  const { historyLogs, doses } = useAppStore();
+const MAX_STREAK_LOOKBACK_DAYS = 365;
 
-  const takenToday = doses.filter((d) => d.status === 'taken').length;
-  const totalToday = doses.length;
+export default function HistoryScreen() {
+  const { historyLogs, getDosesForDate, isDateCompleted } = useAppStore();
+
+  const todayDoses = getDosesForDate(new Date());
+  const takenToday = todayDoses.filter((d) => d.status === 'taken').length;
+  const totalToday = todayDoses.length;
   const adherenceRate =
-    totalToday > 0
-      ? Math.min(100, Math.round(((takenToday + 12) / (totalToday + 13)) * 100))
-      : 95;
+    totalToday > 0 ? Math.round((takenToday / totalToday) * 100) : null;
+
+  // Tính chuỗi ngày liên tiếp uống đủ thuốc từ dữ liệu thực tế (nếu hôm nay chưa hết ngày thì đếm tiếp từ hôm qua)
+  const streakDays = useMemo(() => {
+    const today = new Date();
+    let count = 0;
+    const startOffset = isDateCompleted(today) ? 0 : 1;
+
+    for (let i = startOffset; i < MAX_STREAK_LOOKBACK_DAYS; i++) {
+      if (isDateCompleted(subDays(today, i))) {
+        count += 1;
+      } else {
+        break;
+      }
+    }
+    return count;
+  }, [isDateCompleted]);
+
+  const adherenceHint =
+    adherenceRate === null
+      ? 'Chưa có lịch thuốc'
+      : adherenceRate === 100
+        ? 'Hoàn thành đủ hôm nay'
+        : adherenceRate >= 50
+          ? 'Đang duy trì tốt'
+          : 'Chờ hoàn thành các cữ';
 
   return (
     <SafeAreaView style={{ flex: 1 }} className="flex-1 bg-background">
@@ -48,10 +75,10 @@ export default function HistoryScreen() {
               <Flame size={18} color="#F59E0B" />
             </View>
             <Text className="text-2xl font-bold text-foreground mt-2">
-              7 ngày
+              {streakDays} ngày
             </Text>
             <Text className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-              Đúng giờ liên tục
+              {streakDays > 0 ? 'Đúng giờ liên tục' : 'Chưa có chuỗi ngày'}
             </Text>
           </Card>
 
@@ -59,15 +86,15 @@ export default function HistoryScreen() {
           <Card className="flex-1 p-4 border-border/80">
             <View className="flex-row items-center justify-between">
               <Text className="text-xs font-medium text-muted-foreground">
-                Tỷ lệ tuân thủ
+                Tỷ lệ hôm nay
               </Text>
               <CheckCircle size={18} color="#10B981" />
             </View>
             <Text className="text-2xl font-bold text-foreground mt-2">
-              {adherenceRate}%
+              {adherenceRate !== null ? `${adherenceRate}%` : '—'}
             </Text>
             <Text className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-              Rất xuất sắc
+              {adherenceHint}
             </Text>
           </Card>
         </View>
@@ -77,30 +104,42 @@ export default function HistoryScreen() {
           Gần đây ({historyLogs.length})
         </Text>
 
-        {historyLogs.map((item) => (
-          <Card key={item.id} className="mb-2.5 p-3.5 border-border/70">
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1 mr-2">
-                <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
-                  {item.medicationName}
-                </Text>
-                <Text className="text-xs text-muted-foreground mt-0.5">
-                  {item.dosage} • {item.dateStr}
-                </Text>
-              </View>
-
-              <View className="items-end">
-                <Badge variant="success" label="✓ Đã uống" />
-                <View className="flex-row items-center mt-1">
-                  <Clock size={11} color="#64748B" />
-                  <Text className="text-xs text-muted-foreground ml-1">
-                    {item.takenTime}
+        {historyLogs.length === 0 ? (
+          <Card className="items-center justify-center py-10 px-4 border-border/70">
+            <ClipboardList size={38} color="#94A3B8" strokeWidth={1.5} />
+            <Text className="text-base font-semibold text-foreground mt-3">
+              Chưa có nhật ký uống thuốc
+            </Text>
+            <Text className="text-xs text-muted-foreground text-center mt-1">
+              Khi bạn bấm Đã uống ở màn Hôm nay, lịch sử sẽ tự động lưu lại tại đây.
+            </Text>
+          </Card>
+        ) : (
+          historyLogs.map((item) => (
+            <Card key={item.id} className="mb-2.5 p-3.5 border-border/70">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1 mr-2">
+                  <Text className="text-sm font-semibold text-foreground" numberOfLines={1}>
+                    {item.medicationName}
+                  </Text>
+                  <Text className="text-xs text-muted-foreground mt-0.5">
+                    {item.dosage} • {item.dateStr}
                   </Text>
                 </View>
+
+                <View className="items-end">
+                  <Badge variant="success" label="✓ Đã uống" />
+                  <View className="flex-row items-center mt-1">
+                    <Clock size={11} color="#64748B" />
+                    <Text className="text-xs text-muted-foreground ml-1">
+                      {item.takenTime}
+                    </Text>
+                  </View>
+                </View>
               </View>
-            </View>
-          </Card>
-        ))}
+            </Card>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );

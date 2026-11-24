@@ -93,6 +93,12 @@ export default function RootLayout() {
                   }}
                 />
                 <Stack.Screen
+                  name="health/index"
+                  options={{
+                    headerShown: false,
+                  }}
+                />
+                <Stack.Screen
                   name="doctor-prescriptions/index"
                   options={{
                     headerShown: false,

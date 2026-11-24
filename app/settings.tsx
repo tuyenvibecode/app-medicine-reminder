@@ -475,8 +475,8 @@ export default function SettingsScreen() {
                 pathname: '/reminder/alarm' as any,
                 params: {
                   doseId: nextDose?.id || '',
-                  medicationName: nextDose?.medicationName || 'Amlodipine 5mg (Huyết áp)',
-                  dosage: nextDose?.dosage || '1 viên - Sau ăn',
+                  medicationName: nextDose?.medicationName || 'Thuốc mẫu (Xem thử)',
+                  dosage: nextDose?.dosage || '1 viên - Xem thử báo thức',
                   scheduledTime: nextDose?.scheduledTime || reminderSettings.morningTime,
                   imageUrl: nextDose?.image || '',
                 },

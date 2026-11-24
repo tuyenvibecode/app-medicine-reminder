@@ -32,56 +32,14 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import type { FamilyMember, FamilyRole } from '@/types';
 
-const INITIAL_MEMBERS: FamilyMember[] = [
-  {
-    id: 'u-admin',
-    name: 'Tuyến (tuyen55)',
-    relationship: 'Chủ hộ (Bản thân)',
-    role: 'admin',
-    email: 'tuyen55@giadinh.local',
-    joinedAt: '2026-01-10',
-    isActive: true,
-  },
-  {
-    id: 'u-pharma',
-    name: 'Nguyễn Thuỳ Linh',
-    relationship: 'Vợ (Dược sĩ gia đình)',
-    role: 'pharmacist',
-    email: 'linh.duocsi@giadinh.local',
-    joinedAt: '2026-01-12',
-    isActive: true,
-    inviteCode: 'DUOCSI-88',
-  },
-  {
-    id: 'u-dad',
-    name: 'Nguyễn Văn A',
-    relationship: 'Bố',
-    role: 'patient',
-    email: 'bo@giadinh.local',
-    joinedAt: '2026-02-01',
-    isActive: true,
-    inviteCode: 'GD-8812',
-  },
-  {
-    id: 'u-mom',
-    name: 'Trần Thị B',
-    relationship: 'Mẹ',
-    role: 'patient',
-    email: 'me@giadinh.local',
-    joinedAt: '2026-02-01',
-    isActive: true,
-    inviteCode: 'GD-8834',
-  },
-];
-
 export default function FamilyAdminScreen() {
   const router = useRouter();
-  const [members, setMembers] = useState<FamilyMember[]>(INITIAL_MEMBERS);
+  const [members, setMembers] = useState<FamilyMember[]>([]);
 
   // Modal tạo thành viên mới
   const [modalVisible, setModalVisible] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newRelationship, setNewRelationship] = useState('Bố');
+  const [newRelationship, setNewRelationship] = useState('');
   const [newRole, setNewRole] = useState<FamilyRole>('patient');
 
   const handleCopyCode = (code?: string) => {
@@ -110,7 +68,7 @@ export default function FamilyAdminScreen() {
     const newMemberItem: FamilyMember = {
       id: `u-${Date.now()}`,
       name: newName.trim(),
-      relationship: newRelationship,
+      relationship: newRelationship.trim() || 'Thành viên',
       role: newRole,
       email: `${newName.toLowerCase().replace(/\s+/g, '')}@giadinh.local`,
       joinedAt: new Date().toISOString().split('T')[0],
@@ -121,6 +79,7 @@ export default function FamilyAdminScreen() {
     setMembers((prev) => [...prev, newMemberItem]);
     setModalVisible(false);
     setNewName('');
+    setNewRelationship('');
 
     Alert.alert(
       'Tạo thành viên thành công!',
@@ -185,10 +144,12 @@ export default function FamilyAdminScreen() {
                 Nhóm gia đình
               </Text>
               <Text className="text-lg font-bold text-foreground mt-0.5">
-                Gia đình Hạnh Phúc
+                Gia đình của tôi
               </Text>
               <Text className="text-xs text-muted-foreground mt-1">
-                {members.filter((m) => m.isActive).length}/{members.length} tài khoản đang hoạt động
+                {members.length > 0
+                  ? `${members.filter((m) => m.isActive).length}/${members.length} tài khoản đang hoạt động`
+                  : 'Chưa có thành viên nào được thêm'}
               </Text>
             </View>
 
@@ -203,7 +164,26 @@ export default function FamilyAdminScreen() {
           Danh sách tài khoản ({members.length})
         </Text>
 
-        {members.map((member) => {
+        {members.length === 0 ? (
+          <Card className="items-center justify-center py-10 px-4 border-border/70">
+            <Users size={38} color="#94A3B8" strokeWidth={1.5} />
+            <Text className="text-base font-semibold text-foreground mt-3">
+              Chưa có thành viên gia đình
+            </Text>
+            <Text className="text-xs text-muted-foreground text-center mt-1 mb-4">
+              Thêm người thân và tạo mã mời để kết nối cùng nhau theo dõi lịch uống thuốc.
+            </Text>
+            <Button
+              variant="default"
+              size="sm"
+              className="bg-primary px-4 rounded-xl"
+              onPress={() => setModalVisible(true)}
+            >
+              <Text className="text-white font-semibold text-xs">+ Thêm thành viên</Text>
+            </Button>
+          </Card>
+        ) : (
+          members.map((member) => {
           const isAdmin = member.role === 'admin';
           const isPharmacist = member.role === 'pharmacist';
 
@@ -294,7 +274,8 @@ export default function FamilyAdminScreen() {
               </View>
             </Card>
           );
-        })}
+          })
+        )}
       </ScrollView>
 
       {/* Modal tạo tài khoản người nhà mới */}

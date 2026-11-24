@@ -38,15 +38,21 @@ export default function LoginScreen() {
       return;
     }
 
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+    if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+      Alert.alert(
+        'Chưa kết nối máy chủ Supabase',
+        'Máy này chưa cấu hình file .env (URL & Anon Key). Hiện tại anh vẫn dùng đầy đủ mọi tính năng lưu cục bộ trên máy mà không cần đăng nhập.'
+      );
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-      if (supabaseUrl && !supabaseUrl.includes('placeholder')) {
-        const { error } = await supabase.rpc('join_household', { p_code: cleanCode });
-        if (error) {
-          Alert.alert('Mã mời không hợp lệ', error.message || 'Mã mời đã hết hạn hoặc đã được sử dụng.');
-          return;
-        }
+      const { error } = await supabase.rpc('join_household', { p_code: cleanCode });
+      if (error) {
+        Alert.alert('Mã mời không hợp lệ', error.message || 'Mã mời đã hết hạn hoặc đã được sử dụng.');
+        return;
       }
 
       try {
@@ -69,6 +75,15 @@ export default function LoginScreen() {
   const handlePasswordLogin = async () => {
     if (!email || !password) {
       Alert.alert('Thông báo', 'Vui lòng nhập đầy đủ Email và Mật khẩu.');
+      return;
+    }
+
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+    if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+      Alert.alert(
+        'Chưa kết nối máy chủ Supabase',
+        'Máy này chưa cấu hình file .env (URL & Anon Key). Khi nào bổ sung URL & Key thì mới cần đăng nhập đám mây.'
+      );
       return;
     }
 
@@ -127,19 +142,28 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        {/* Tab chuyển đổi cách đăng nhập */}
+        {/* Tab chuyển đổi cách đăng nhập (dùng style trực tiếp để tránh lỗi NativeWind v4 dynamic shadow interop) */}
         <View className="flex-row bg-muted/60 p-1 rounded-2xl mb-4">
           <TouchableOpacity
             onPress={() => setAuthMode('invite')}
-            className={`flex-1 py-2.5 rounded-xl items-center flex-row justify-center ${
-              authMode === 'invite' ? 'bg-card shadow-sm' : ''
-            }`}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              borderRadius: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: authMode === 'invite' ? '#FFFFFF' : 'transparent',
+            }}
           >
             <Sparkles size={14} color={authMode === 'invite' ? '#0D9488' : '#64748B'} />
             <Text
-              className={`text-xs font-semibold ml-1.5 ${
-                authMode === 'invite' ? 'text-primary' : 'text-muted-foreground'
-              }`}
+              style={{
+                fontSize: 12,
+                fontWeight: '600',
+                marginLeft: 6,
+                color: authMode === 'invite' ? '#0D9488' : '#64748B',
+              }}
             >
               Mã gia đình (1-chạm)
             </Text>
@@ -147,15 +171,24 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             onPress={() => setAuthMode('password')}
-            className={`flex-1 py-2.5 rounded-xl items-center flex-row justify-center ${
-              authMode === 'password' ? 'bg-card shadow-sm' : ''
-            }`}
+            style={{
+              flex: 1,
+              paddingVertical: 10,
+              borderRadius: 12,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: authMode === 'password' ? '#FFFFFF' : 'transparent',
+            }}
           >
             <Mail size={14} color={authMode === 'password' ? '#0D9488' : '#64748B'} />
             <Text
-              className={`text-xs font-semibold ml-1.5 ${
-                authMode === 'password' ? 'text-primary' : 'text-muted-foreground'
-              }`}
+              style={{
+                fontSize: 12,
+                fontWeight: '600',
+                marginLeft: 6,
+                color: authMode === 'password' ? '#0D9488' : '#64748B',
+              }}
             >
               Email & Mật khẩu
             </Text>
@@ -165,7 +198,7 @@ export default function LoginScreen() {
         <Card className="p-5 border-border/80">
           {authMode === 'invite' ? (
             /* Phương thức 1: Nhập mã gia đình */
-            <View>
+            <View key="auth-mode-invite">
               <Text className="text-sm font-semibold text-foreground mb-1">
                 Mã mời gia đình
               </Text>
@@ -186,6 +219,7 @@ export default function LoginScreen() {
                 size="lg"
                 className="bg-primary w-full h-13 rounded-2xl"
                 onPress={handleInviteCodeLogin}
+                disabled={isLoading}
               >
                 <Text className="text-white font-bold text-base">
                   Vào ứng dụng ngay
@@ -198,7 +232,7 @@ export default function LoginScreen() {
             </View>
           ) : (
             /* Phương thức 2: Email & Mật khẩu */
-            <View>
+            <View key="auth-mode-password">
               <View className="mb-4">
                 <Text className="text-sm font-semibold text-foreground mb-1.5">
                   Tài khoản Email
@@ -206,7 +240,7 @@ export default function LoginScreen() {
                 <Input
                   value={email}
                   onChangeText={setEmail}
-                  placeholder="tuyen55@giadinh.local"
+                  placeholder="email@example.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />

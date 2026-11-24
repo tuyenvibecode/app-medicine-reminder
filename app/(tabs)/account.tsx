@@ -18,9 +18,9 @@ import {
   Users,
   KeyRound,
   LogOut,
+  LogIn,
   ChevronRight,
   QrCode,
-  Lock,
   Settings,
   FileText,
   BellRing,
@@ -29,35 +29,42 @@ import * as Haptics from 'expo-haptics';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { useAppStore } from '@/context/AppContext';
 import { supabase } from '@/lib/supabase';
 
 export default function AccountScreen() {
   const router = useRouter();
-  const { doctorPrescriptions, reminderSettings } = useAppStore();
+  const { doctorPrescriptions, omronReadings, reminderSettings } = useAppStore();
 
-  // Trạng thái phiên đăng nhập: đồng bộ với Supabase Auth nếu đã cấu hình, hỗ trợ chế độ offline gia đình
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
-  const [userEmail, setUserEmail] = useState('tuyen55@giadinh.local');
-  const [inviteCodeInput, setInviteCodeInput] = useState('');
+  // Trạng thái phiên đăng nhập thật từ Supabase Auth (mặc định dùng chế độ cục bộ khi chưa kết nối)
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [displayName, setDisplayName] = useState('');
 
   useEffect(() => {
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
     if (!supabaseUrl || supabaseUrl.includes('placeholder')) return;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (data?.session?.user) {
+    const applySessionUser = (email?: string | null, fullName?: string) => {
+      if (email) {
         setIsLoggedIn(true);
-        setUserEmail(data.session.user.email || 'tuyen55@giadinh.local');
+        setUserEmail(email);
+        setDisplayName(fullName || email.split('@')[0] || 'Thành viên gia đình');
+      } else {
+        setIsLoggedIn(false);
+        setUserEmail('');
+        setDisplayName('');
       }
+    };
+
+    supabase.auth.getSession().then(({ data }) => {
+      const user = data?.session?.user;
+      applySessionUser(user?.email, user?.user_metadata?.full_name as string | undefined);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setIsLoggedIn(true);
-        setUserEmail(session.user.email || 'tuyen55@giadinh.local');
-      }
+      const user = session?.user;
+      applySessionUser(user?.email, user?.user_metadata?.full_name as string | undefined);
     });
 
     return () => {
@@ -80,24 +87,11 @@ export default function AccountScreen() {
             await supabase.auth.signOut();
           } catch {}
           setIsLoggedIn(false);
+          setUserEmail('');
+          setDisplayName('');
         },
       },
     ]);
-  };
-
-  // Đăng nhập nhanh bằng Mã mời gia đình
-  const handleLoginByInviteCode = () => {
-    if (!inviteCodeInput.trim()) {
-      Alert.alert('Thông báo', 'Vui lòng nhập mã gia đình 6 ký tự.');
-      return;
-    }
-
-    try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {}
-
-    Alert.alert('Thành công', 'Đã kết nối vào Gia đình! Hồ sơ sức khoẻ đã được đồng bộ.');
-    setIsLoggedIn(true);
   };
 
   return (
@@ -117,41 +111,71 @@ export default function AccountScreen() {
           </Text>
         </View>
 
-        {isLoggedIn ? (
-          /* TRƯỜNG HỢP: ĐÃ ĐĂNG NHẬP */
-          <View>
-            {/* 1. Thẻ thông tin người dùng */}
-            <Card className="mb-5 p-5 border-border/80">
-              <View className="flex-row items-center">
-                {/* Avatar */}
-                <View className="h-16 w-16 rounded-full bg-primary/10 border-2 border-primary/30 items-center justify-center">
-                  <User size={32} color="#0D9488" strokeWidth={2} />
-                </View>
-
-                {/* Thông tin */}
-                <View className="ml-4 flex-1">
-                  <View className="flex-row items-center">
-                    <Text className="text-lg font-bold text-foreground">
-                      Tuyến (tuyen55)
-                    </Text>
-                    <Badge variant="default" label="Chủ hộ" className="ml-2" />
-                  </View>
-                  <Text className="text-sm text-muted-foreground mt-0.5">
-                    {userEmail}
-                  </Text>
-                  <Text className="text-xs text-primary font-medium mt-1">
-                    Quản trị viên gia đình
-                  </Text>
-                </View>
+        <View>
+          {/* 1. Thẻ trạng thái tài khoản (đồng bộ Supabase hoặc chế độ lưu cục bộ trên máy) */}
+          <Card className="mb-5 p-5 border-border/80">
+            <View className="flex-row items-center">
+              {/* Avatar */}
+              <View className="h-16 w-16 rounded-full bg-primary/10 border-2 border-primary/30 items-center justify-center">
+                <User size={32} color="#0D9488" strokeWidth={2} />
               </View>
-            </Card>
 
-            {/* 2. HỒ SƠ ĐƠN THUỐC CỦA BẠN (Lưu ảnh gốc sắc nét, AI tự điền & so sánh chỉ số) */}
+              {/* Thông tin */}
+              <View className="ml-4 flex-1">
+                {isLoggedIn ? (
+                  <>
+                    <View className="flex-row items-center flex-wrap gap-1.5">
+                      <Text className="text-lg font-bold text-foreground">
+                        {displayName}
+                      </Text>
+                      <Badge variant="default" label="Đã đồng bộ" />
+                    </View>
+                    <Text className="text-sm text-muted-foreground mt-0.5">
+                      {userEmail}
+                    </Text>
+                    <Text className="text-xs text-primary font-medium mt-1">
+                      Tài khoản gia đình
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <View className="flex-row items-center flex-wrap gap-1.5">
+                      <Text className="text-lg font-bold text-foreground">
+                        Dùng trên thiết bị này
+                      </Text>
+                      <Badge variant="secondary" label="Cục bộ" />
+                    </View>
+                    <Text className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      Dữ liệu thuốc và lịch nhắc đang lưu riêng tư trên máy. Đăng nhập để đồng bộ cùng gia đình.
+                    </Text>
+                  </>
+                )}
+              </View>
+            </View>
+
+            {!isLoggedIn && (
+              <Button
+                variant="default"
+                size="default"
+                className="bg-primary w-full h-11 rounded-2xl mt-4"
+                onPress={() => router.push('/(auth)/login')}
+              >
+                <View className="flex-row items-center justify-center">
+                  <LogIn size={16} color="#FFFFFF" />
+                  <Text className="text-white font-semibold text-sm ml-2">
+                    Đăng nhập / Kết nối gia đình
+                  </Text>
+                </View>
+              </Button>
+            )}
+          </Card>
+
+            {/* 2. QUẢN LÝ SỨC KHOẺ (Đo máy Omron chuẩn Bộ Y tế & Hồ sơ khám nhiều ảnh) */}
             <Text className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 ml-1">
-              Hồ sơ Y tế & Đơn thuốc
+              Quản lý Sức khoẻ & Đơn thuốc
             </Text>
             <TouchableOpacity
-              onPress={() => router.push('/doctor-prescriptions' as any)}
+              onPress={() => router.push('/health' as any)}
               activeOpacity={0.75}
               className="mb-5"
             >
@@ -164,19 +188,19 @@ export default function AccountScreen() {
                     <View className="ml-3 flex-1">
                       <View className="flex-row items-center flex-wrap gap-1.5">
                         <Text className="text-base font-bold text-foreground">
-                          Đơn thuốc của bạn
+                          Sức khoẻ & Đơn thuốc
                         </Text>
                         <Badge
                           variant="default"
                           label={
-                            doctorPrescriptions.length > 0
-                              ? `${doctorPrescriptions.length} đơn đã lưu`
-                              : 'AI & Ảnh HD'
+                            omronReadings.length + doctorPrescriptions.length > 0
+                              ? `${omronReadings.length} đo HA • ${doctorPrescriptions.length} đơn`
+                              : 'Omron & Khám bệnh'
                           }
                         />
                       </View>
                       <Text className="text-xs text-muted-foreground mt-1" numberOfLines={2}>
-                        Chụp ảnh toa thuốc tự điền thông tin & theo dõi chỉ số Huyết áp, Đường huyết
+                        Đo huyết áp Omron chuẩn Bộ Y tế, lưu nhiều ảnh giấy khám & so sánh thay đổi thuốc
                       </Text>
                     </View>
                   </View>
@@ -271,7 +295,7 @@ export default function AccountScreen() {
                       Mã mời kết nối người nhà
                     </Text>
                     <Text className="text-xs text-muted-foreground mt-0.5">
-                      Đang kết nối 4 thành viên gia đình
+                      Quản lý thành viên & mã mời gia đình
                     </Text>
                   </View>
                 </View>
@@ -301,80 +325,23 @@ export default function AccountScreen() {
               </View>
             </Card>
 
-            {/* Nút Đăng xuất */}
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full h-13 rounded-2xl border-destructive/40 bg-destructive/5"
-              onPress={handleLogout}
-            >
-              <View className="flex-row items-center justify-center">
-                <LogOut size={18} color="#EF4444" />
-                <Text className="text-destructive font-semibold text-base ml-2">
-                  Đăng xuất tài khoản
-                </Text>
-              </View>
-            </Button>
-          </View>
-        ) : (
-          /* TRƯỜNG HỢP: CHƯA ĐĂNG NHẬP / MÀN HÌNH ĐĂNG NHẬP TẠI CHỖ */
-          <View>
-            <Card className="p-5 border-border/80 mb-5">
-              <View className="items-center mb-5">
-                <View className="h-16 w-16 rounded-3xl bg-primary/10 items-center justify-center mb-3">
-                  <Lock size={30} color="#0D9488" />
-                </View>
-                <Text className="text-xl font-bold text-foreground">
-                  Đăng nhập tài khoản
-                </Text>
-                <Text className="text-xs text-muted-foreground text-center mt-1 px-2">
-                  Dành riêng cho các thành viên trong gia đình
-                </Text>
-              </View>
-
-              {/* Cách 1: Đăng nhập bằng Mã mời 6 số (tiện cho bố mẹ) */}
-              <Text className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">
-                Cách 1: Nhập mã gia đình (1-chạm)
-              </Text>
-              <View className="flex-row gap-2 mb-4">
-                <Input
-                  value={inviteCodeInput}
-                  onChangeText={setInviteCodeInput}
-                  placeholder="Ví dụ: GD-8899"
-                  className="flex-1 uppercase font-bold text-center tracking-widest"
-                />
-                <Button
-                  variant="default"
-                  className="bg-primary px-4 rounded-2xl"
-                  onPress={handleLoginByInviteCode}
-                >
-                  <Text className="text-white font-semibold">Kết nối</Text>
-                </Button>
-              </View>
-
-              <View className="h-[1px] bg-border/60 my-3" />
-
-              {/* Cách 2: Đăng nhập bằng Email/Mật khẩu */}
-              <Text className="text-xs font-semibold text-primary uppercase tracking-wider mb-2">
-                Cách 2: Tài khoản quản trị viên
-              </Text>
+            {/* Nút Đăng xuất (chỉ hiện khi đã đăng nhập tài khoản đám mây) */}
+            {isLoggedIn && (
               <Button
                 variant="outline"
                 size="lg"
-                className="w-full h-12 rounded-2xl mb-2"
-                onPress={() => router.push('/(auth)/login')}
+                className="w-full h-13 rounded-2xl border-destructive/40 bg-destructive/5"
+                onPress={handleLogout}
               >
-                <Text className="text-foreground font-semibold text-sm">
-                  Đăng nhập bằng Email & Mật khẩu
-                </Text>
+                <View className="flex-row items-center justify-center">
+                  <LogOut size={18} color="#EF4444" />
+                  <Text className="text-destructive font-semibold text-base ml-2">
+                    Đăng xuất tài khoản
+                  </Text>
+                </View>
               </Button>
-
-              <Text className="text-[11px] text-muted-foreground text-center mt-2 leading-relaxed">
-                App gia đình riêng tư: Tài khoản được cấp bởi Quản trị viên (Chủ hộ). Không hỗ trợ đăng ký tự do để bảo mật thông tin sức khỏe.
-              </Text>
-            </Card>
+            )}
           </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   );

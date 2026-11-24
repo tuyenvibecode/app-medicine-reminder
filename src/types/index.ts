@@ -134,7 +134,7 @@ export interface Prescription {
   status: 'active' | 'completed';
 }
 
-// Đơn thuốc của bạn (lưu ảnh độ phân giải cao sắc nét, tự điền thông tin bằng AI & lưu chỉ số Huyết áp / Đường huyết để so sánh)
+// Đơn thuốc của bạn (lưu nhiều ảnh độ phân giải cao sắc nét, tự điền thông tin bằng AI & lưu chỉ số Huyết áp / Đường huyết để so sánh)
 export interface DoctorPrescription {
   id: string;
   title: string; // Loại bệnh / Tên đơn (ví dụ: "Đơn thuốc Huyết áp", "Đơn thuốc Tiểu đường")
@@ -142,11 +142,24 @@ export interface DoctorPrescription {
   medicationsText?: string; // Tên các thuốc trong đơn (AI đọc tự điền hoặc nhập tay)
   bloodPressureSystolic?: number | null; // Huyết áp tâm thu (ví dụ: 130 mmHg)
   bloodPressureDiastolic?: number | null; // Huyết áp tâm trương (ví dụ: 85 mmHg)
-  bloodSugar?: number | null; // Chỉ số đường huyết (ví dụ: 6.4 mmol/L)
-  startDate: string; // Ngày bắt đầu khởi tạo đơn thuốc (ví dụ: "21/11/2026")
-  imageUri: string; // Ảnh chụp sắc nét độ phân giải gốc
+  heartRate?: number | null; // Nhịp tim lúc khám (lần/phút)
+  bloodSugar?: number | null; // Chỉ số đường huyết lúc đói (ví dụ: 6.4 mmol/L)
+  startDate: string; // Ngày khám / bắt đầu đơn thuốc (ví dụ: "21/11/2026")
+  imageUri: string; // Ảnh đại diện độ phân giải gốc (tương thích ngược)
+  imageUris?: string[]; // Toàn bộ ảnh giấy khám + đơn thuốc trong cùng đợt khám
   notes?: string; // Ghi chú tái khám (AI tự điền hoặc chỉnh sửa)
   createdAt: string;
+}
+
+// Chỉ số đo huyết áp & nhịp tim tại nhà (từ máy đo điện tử Omron hoặc nhập tay)
+export interface OmronReading {
+  id: string;
+  systolic: number; // SYS (Huyết áp tâm thu, mmHg)
+  diastolic: number; // DIA (Huyết áp tâm trương, mmHg)
+  pulse: number; // PULSE (Nhịp tim, lần/phút)
+  measuredAt: string; // ISO string thời điểm đo
+  imageUri?: string | null; // Ảnh màn hình máy đo đã lọc bỏ EXIF GPS
+  notes?: string;
 }
 
 // Cấu hình khung giờ nhắc mặc định, nhạc chuông & model AI dự phòng

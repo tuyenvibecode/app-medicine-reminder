@@ -25,180 +25,9 @@ import type {
   TimeOfDayGroup,
   TreatmentType,
   DoctorPrescription,
+  OmronReading,
   ReminderSettings,
 } from '@/types';
-
-const INITIAL_MEDICATIONS: Medication[] = [
-  {
-    id: 'm-diabetes',
-    user_id: 'u1',
-    name: 'Glucophage XR 500mg (Tiểu đường)',
-    dosage: '1 viên / ngày - Sau bữa tối',
-    notes: 'Liệu trình điều trị 3 tháng liên tiếp',
-    treatment_type: 'course',
-    course_duration_months: 3,
-    total_course_stock: 90,
-    stock: 30,
-    low_stock_threshold: 5,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'm1',
-    user_id: 'u1',
-    name: 'Amlodipine 5mg (Huyết áp)',
-    dosage: '1 viên / ngày',
-    notes: 'Uống sau bữa ăn sáng',
-    treatment_type: 'ongoing',
-    stock: 24,
-    low_stock_threshold: 5,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'm2',
-    user_id: 'u1',
-    name: 'Omega 3 Dầu cá Nauy',
-    dosage: '1 viên nang mềm / ngày',
-    notes: 'Bảo quản nơi thoáng mát',
-    treatment_type: 'ongoing',
-    stock: 12,
-    low_stock_threshold: 7,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'm3',
-    user_id: 'u1',
-    name: 'Vitamin C 500mg',
-    dosage: '1 viên / ngày',
-    notes: 'Uống sau bữa trưa',
-    treatment_type: 'ongoing',
-    stock: 4,
-    low_stock_threshold: 5,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: 'm4',
-    user_id: 'u1',
-    name: 'Magnesium B6',
-    dosage: '1 viên / ngày',
-    notes: 'Uống trước khi ngủ 30 phút',
-    treatment_type: 'ongoing',
-    stock: 30,
-    low_stock_threshold: 6,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
-
-const INITIAL_DOSES: DoseTimelineItem[] = [
-  {
-    id: '1',
-    scheduleId: 's1',
-    medicationId: 'm1',
-    medicationName: 'Amlodipine 5mg (Huyết áp)',
-    dosage: '1 viên (5mg) - Sau ăn',
-    scheduledTime: '07:30',
-    timeGroup: 'morning',
-    status: 'taken',
-    stock: 24,
-    lowStockThreshold: 5,
-  },
-  {
-    id: '2',
-    scheduleId: 's2',
-    medicationId: 'm2',
-    medicationName: 'Omega 3 Dầu cá Nauy',
-    dosage: '1 viên nang mềm - Sau ăn',
-    scheduledTime: '08:00',
-    timeGroup: 'morning',
-    status: 'upcoming',
-    stock: 12,
-    lowStockThreshold: 7,
-  },
-  {
-    id: '3',
-    scheduleId: 's3',
-    medicationId: 'm3',
-    medicationName: 'Vitamin C 500mg',
-    dosage: '1 viên - Sau bữa trưa',
-    scheduledTime: '12:30',
-    timeGroup: 'noon',
-    status: 'upcoming',
-    stock: 4,
-    lowStockThreshold: 5,
-  },
-  {
-    id: '5',
-    scheduleId: 's5',
-    medicationId: 'm-diabetes',
-    medicationName: 'Glucophage XR 500mg (Tiểu đường)',
-    dosage: '1 viên - Sau bữa tối',
-    scheduledTime: '19:30',
-    timeGroup: 'evening',
-    status: 'upcoming',
-    stock: 30,
-    totalCourseStock: 90,
-    courseDurationMonths: 3,
-    treatmentType: 'course',
-    lowStockThreshold: 5,
-  },
-  {
-    id: '4',
-    scheduleId: 's4',
-    medicationId: 'm4',
-    medicationName: 'Magnesium B6',
-    dosage: '1 viên - Trước khi ngủ 30 phút',
-    scheduledTime: '21:00',
-    timeGroup: 'evening',
-    status: 'upcoming',
-    stock: 30,
-    lowStockThreshold: 6,
-  },
-];
-
-const INITIAL_HISTORY_LOGS: HistoryLogItem[] = [
-  {
-    id: 'l1',
-    doseId: '1',
-    medicationName: 'Amlodipine 5mg (Huyết áp)',
-    dosage: '1 viên (5mg) - Sau ăn',
-    takenTime: '07:35',
-    dateStr: 'Hôm nay',
-    status: 'taken',
-  },
-  {
-    id: 'l2',
-    medicationName: 'Magnesium B6',
-    dosage: '1 viên',
-    takenTime: '21:10',
-    dateStr: 'Hôm qua',
-    status: 'taken',
-  },
-  {
-    id: 'l3',
-    medicationName: 'Vitamin C 500mg',
-    dosage: '1 viên',
-    takenTime: '12:45',
-    dateStr: 'Hôm qua',
-    status: 'taken',
-  },
-  {
-    id: 'l4',
-    medicationName: 'Amlodipine 5mg (Huyết áp)',
-    dosage: '1 viên 5mg',
-    takenTime: '07:40',
-    dateStr: 'Hôm qua',
-    status: 'taken',
-  },
-];
 
 const INITIAL_REMINDER_SETTINGS: ReminderSettings = {
   morningTime: '07:30',
@@ -230,6 +59,7 @@ interface AppContextValue {
   doses: DoseTimelineItem[];
   historyLogs: HistoryLogItem[];
   doctorPrescriptions: DoctorPrescription[];
+  omronReadings: OmronReading[];
   reminderSettings: ReminderSettings;
   getDosesForDate: (date: Date) => DoseTimelineItem[];
   getLogsForDate: (date: Date) => HistoryLogItem[];
@@ -245,6 +75,8 @@ interface AppContextValue {
   syncPrescriptionToReminders: (items: PrescriptionMedicineItem[]) => void;
   addDoctorPrescription: (item: Omit<DoctorPrescription, 'id' | 'createdAt'>) => void;
   deleteDoctorPrescription: (id: string) => void;
+  addOmronReading: (item: Omit<OmronReading, 'id'>) => void;
+  deleteOmronReading: (id: string) => void;
   updateReminderSettings: (patch: Partial<ReminderSettings>) => void;
 }
 
@@ -262,10 +94,12 @@ export function getTimeGroupFromTime(timeStr: string): TimeOfDayGroup {
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [medications, setMedications] = useState<Medication[]>(INITIAL_MEDICATIONS);
-  const [doses, setDoses] = useState<DoseTimelineItem[]>(INITIAL_DOSES);
-  const [historyLogs, setHistoryLogs] = useState<HistoryLogItem[]>(INITIAL_HISTORY_LOGS);
+  // Khởi tạo trống sạch, không nạp dữ liệu thuốc ảo khi mở app lần đầu
+  const [medications, setMedications] = useState<Medication[]>([]);
+  const [doses, setDoses] = useState<DoseTimelineItem[]>([]);
+  const [historyLogs, setHistoryLogs] = useState<HistoryLogItem[]>([]);
   const [doctorPrescriptions, setDoctorPrescriptions] = useState<DoctorPrescription[]>([]);
+  const [omronReadings, setOmronReadings] = useState<OmronReading[]>([]);
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(
     INITIAL_REMINDER_SETTINGS
   );
@@ -274,24 +108,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Lưu trạng thái đã uống theo từng ngày 'yyyy-MM-dd' -> { [doseId]: 'taken' | 'upcoming' }
   const [dateDoseStatusMap, setDateDoseStatusMap] = useState<
     Record<string, Record<string, DoseStatus>>
-  >(() => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const initialMap: Record<string, Record<string, DoseStatus>> = {
-      [todayKey]: { '1': 'taken' },
-    };
-    // Khởi tạo dữ liệu mẫu lịch sử 7 ngày gần nhất để khi bấm xem lại các ngày trước hiển thị đầy đủ
-    for (let i = 1; i <= 7; i++) {
-      const pastKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
-      initialMap[pastKey] = {
-        '1': 'taken',
-        '2': 'taken',
-        '3': 'taken',
-        '4': 'taken',
-        '5': i === 3 ? 'upcoming' : 'taken', // Ngày thứ 3 trước đó uống 4/5 liều
-      };
-    }
-    return initialMap;
-  });
+  >({});
 
   // Tự động tải lại cấu hình giờ nhắc + toàn bộ dữ liệu thuốc/lịch đã lưu trên thiết bị khi mở app
   useEffect(() => {
@@ -302,10 +119,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setReminderSettings((prev) => ({ ...prev, ...savedSettings }));
       }
       if (savedData) {
-        if (Array.isArray(savedData.medications) && savedData.medications.length > 0) {
+        if (Array.isArray(savedData.medications)) {
           setMedications(savedData.medications);
         }
-        if (Array.isArray(savedData.doses) && savedData.doses.length > 0) {
+        if (Array.isArray(savedData.doses)) {
           setDoses(savedData.doses);
         }
         if (Array.isArray(savedData.historyLogs)) {
@@ -313,6 +130,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
         if (Array.isArray(savedData.doctorPrescriptions)) {
           setDoctorPrescriptions(savedData.doctorPrescriptions);
+        }
+        if (Array.isArray(savedData.omronReadings)) {
+          setOmronReadings(savedData.omronReadings);
         }
         if (savedData.dateDoseStatusMap && typeof savedData.dateDoseStatusMap === 'object') {
           setDateDoseStatusMap(savedData.dateDoseStatusMap);
@@ -334,37 +154,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       doses,
       historyLogs,
       doctorPrescriptions,
+      omronReadings,
       dateDoseStatusMap,
     });
-  }, [medications, doses, historyLogs, doctorPrescriptions, dateDoseStatusMap]);
+  }, [medications, doses, historyLogs, doctorPrescriptions, omronReadings, dateDoseStatusMap]);
 
   // Lấy danh sách liều thuốc đang hoạt động kèm trạng thái đúng của ngày được chọn trên Lịch
   const getDosesForDate = useCallback(
     (date: Date): DoseTimelineItem[] => {
       const dateKey = format(date, 'yyyy-MM-dd');
-      const todayKey = format(new Date(), 'yyyy-MM-dd');
       const statusMapForDate = dateDoseStatusMap[dateKey] || {};
       const inactiveMedIds = new Set(
         medications.filter((m) => m.is_active === false).map((m) => m.id)
       );
 
+      // Luôn lấy trạng thái Đã uống / Chưa uống theo đúng từng ngày trong dateDoseStatusMap,
+      // không dùng lại status lưu trên lịch gốc để tránh sang ngày mới bị dính "Đã uống" từ hôm qua.
       return doses
         .filter((d) => !inactiveMedIds.has(d.medicationId))
-        .map((d) => {
-          if (dateKey === todayKey) {
-            const override = statusMapForDate[d.id];
-            return override ? { ...d, status: override } : d;
-          }
-          if (dateKey > todayKey) {
-            // Ngày trong tương lai: mặc định chưa uống
-            return { ...d, status: statusMapForDate[d.id] || 'upcoming' };
-          }
-          // Ngày trong quá khứ: lấy từ lịch sử ngày đó
-          return {
-            ...d,
-            status: statusMapForDate[d.id] || 'upcoming',
-          };
-        });
+        .map((d) => ({
+          ...d,
+          status: statusMapForDate[d.id] || 'upcoming',
+        }));
     },
     [doses, medications, dateDoseStatusMap]
   );
@@ -421,16 +232,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
     }));
 
+    // Chỉ trừ tồn kho trên lịch gốc; trạng thái đã uống theo ngày đã được lưu riêng trong dateDoseStatusMap
     setDoses((prev) =>
       prev.map((d) => {
-        if (d.id === item.id) {
-          const nextStock = d.stock !== undefined ? Math.max(0, d.stock - 1) : undefined;
-          return {
-            ...d,
-            status: dateKey === todayKey ? 'taken' : d.status,
-            stock: nextStock,
-          };
-        }
         if (d.medicationId === item.medicationId && d.stock !== undefined) {
           return { ...d, stock: Math.max(0, d.stock - 1) };
         }
@@ -514,16 +318,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
     }));
 
+    // Hoàn lại tồn kho trên lịch gốc; trạng thái theo ngày đã được cập nhật trong dateDoseStatusMap
     setDoses((prev) =>
       prev.map((d) => {
-        if (d.id === item.id) {
-          const nextStock = d.stock !== undefined ? d.stock + 1 : undefined;
-          return {
-            ...d,
-            status: dateKey === todayKey ? 'upcoming' : d.status,
-            stock: nextStock,
-          };
-        }
         if (d.medicationId === item.medicationId && d.stock !== undefined) {
           return { ...d, stock: d.stock + 1 };
         }
@@ -839,6 +636,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setDoctorPrescriptions((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
+  // Lưu lần đo huyết áp & nhịp tim mới (máy Omron tại nhà)
+  const addOmronReading = useCallback((item: Omit<OmronReading, 'id'>) => {
+    const newReading: OmronReading = {
+      ...item,
+      id: `omron-${Date.now()}`,
+    };
+    setOmronReadings((prev) => [newReading, ...prev]);
+  }, []);
+
+  const deleteOmronReading = useCallback((id: string) => {
+    setOmronReadings((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
   // Cập nhật cấu hình giờ nhắc / nhạc chuông:
   // - Lưu vĩnh viễn vào SecureStore
   // - Tự động đồng bộ giờ mới vào các liều trong ngày (Hôm nay) tương ứng buổi Sáng/Trưa/Chiều/Tối
@@ -904,6 +714,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         doses,
         historyLogs,
         doctorPrescriptions,
+        omronReadings,
         reminderSettings,
         getDosesForDate,
         getLogsForDate,
@@ -919,6 +730,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         syncPrescriptionToReminders,
         addDoctorPrescription,
         deleteDoctorPrescription,
+        addOmronReading,
+        deleteOmronReading,
         updateReminderSettings,
       }}
     >

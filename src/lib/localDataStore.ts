@@ -8,17 +8,73 @@ import type {
   DoseTimelineItem,
   HistoryLogItem,
   DoctorPrescription,
+  OmronReading,
   DoseStatus,
 } from '@/types';
 
 const KEY_APP_LOCAL_DATA = 'app_local_data_v1';
+
+// Danh sách ID dữ liệu mẫu cũ từng được khởi tạo sẵn ở giai đoạn làm giao diện.
+// Lọc bỏ tự động khi tải dữ liệu để thiết bị đã cài bản cũ cũng sạch dữ liệu ảo,
+// nhưng vẫn giữ nguyên thuốc/lịch thật do người dùng tự thêm.
+const LEGACY_MOCK_MEDICATION_IDS = new Set(['m-diabetes', 'm1', 'm2', 'm3', 'm4']);
+const LEGACY_MOCK_DOSE_IDS = new Set(['1', '2', '3', '4', '5']);
+const LEGACY_MOCK_LOG_IDS = new Set(['l1', 'l2', 'l3', 'l4']);
 
 export interface PersistedAppData {
   medications: Medication[];
   doses: DoseTimelineItem[];
   historyLogs: HistoryLogItem[];
   doctorPrescriptions: DoctorPrescription[];
+  omronReadings: OmronReading[];
   dateDoseStatusMap: Record<string, Record<string, DoseStatus>>;
+}
+
+/**
+ * Loại bỏ các bản ghi mẫu cũ (nếu còn sót trong bộ nhớ máy) mà không đụng vào dữ liệu thật.
+ */
+export function stripLegacyMockData(
+  data: Partial<PersistedAppData>
+): Partial<PersistedAppData> {
+  const cleaned: Partial<PersistedAppData> = { ...data };
+
+  if (Array.isArray(data.medications)) {
+    cleaned.medications = data.medications.filter(
+      (m) => !LEGACY_MOCK_MEDICATION_IDS.has(m.id)
+    );
+  }
+
+  if (Array.isArray(data.doses)) {
+    cleaned.doses = data.doses.filter(
+      (d) =>
+        !LEGACY_MOCK_DOSE_IDS.has(d.id) &&
+        !LEGACY_MOCK_MEDICATION_IDS.has(d.medicationId)
+    );
+  }
+
+  if (Array.isArray(data.historyLogs)) {
+    cleaned.historyLogs = data.historyLogs.filter(
+      (l) =>
+        !LEGACY_MOCK_LOG_IDS.has(l.id) &&
+        (!l.doseId || !LEGACY_MOCK_DOSE_IDS.has(l.doseId))
+    );
+  }
+
+  if (data.dateDoseStatusMap && typeof data.dateDoseStatusMap === 'object') {
+    const nextMap: Record<string, Record<string, DoseStatus>> = {};
+    for (const [dateKey, statusByDose] of Object.entries(data.dateDoseStatusMap)) {
+      if (!statusByDose || typeof statusByDose !== 'object') continue;
+      const filteredEntries = Object.entries(statusByDose).filter(
+        ([doseId]) => !LEGACY_MOCK_DOSE_IDS.has(doseId)
+      );
+      if (filteredEntries.length > 0) {
+        nextMap[dateKey] = Object.fromEntries(filteredEntries);
+      }
+    }
+    cleaned.dateDoseStatusMap = nextMap;
+  }
+
+  return cleaned;
 }
 
 /**
@@ -28,7 +84,8 @@ export async function loadAppLocalData(): Promise<Partial<PersistedAppData> | nu
   try {
     const raw = await LargeSecureStoreAdapter.getItem(KEY_APP_LOCAL_DATA);
     if (!raw) return null;
-    return JSON.parse(raw) as Partial<PersistedAppData>;
+    const parsed = JSON.parse(raw) as Partial<PersistedAppData>;
+    return stripLegacyMockData(parsed);
   } catch {
     return null;
   }

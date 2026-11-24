@@ -1,53 +1,66 @@
-// Mục đích: Supabase Edge Function đọc chữ từ ảnh đơn thuốc bằng Gemini Interactions API có dự phòng.
-// supabase/functions/ocr-prescription/index.ts
-// Supabase Edge Function đọc chữ từ ảnh đơn thuốc (OCR) bằng Gemini Interactions API (v1)
+// Mục đích: Supabase Edge Function đọc chữ từ ảnh đơn thuốc, giấy khám (nhiều ảnh) và màn hình máy đo huyết áp Omron bằng Gemini API.
 // Tuân thủ rule 01-security.md & 04-medical-safety.md:
 // 1. Khoá GEMINI_API_KEY chỉ nằm trong Supabase Secrets trên server, tuyệt đối không nằm trong APK.
-// 2. Có chuỗi Model Dự Phòng Tự Động (Auto-Fallback Chain): nếu model chính bị đổi tên/quá tải,
-//    tự động chuyển sang các model dự phòng tiếp theo mà không làm gián đoạn ứng dụng.
-// 3. Không ghi log nội dung ảnh y tế nhạy cảm của người dùng.
+// 2. Hỗ trợ chuẩn Authorization Key mới của Google AI Studio (bắt đầu bằng "AQ.") qua header x-goog-api-key (miễn phí, không cần Billing Vertex AI).
+// 3. Không ghi log nội dung ảnh y tế nhạy cảm của người dùng. AI chỉ trích xuất chữ/số, không tự chẩn đoán.
 
-const INTERACTIONS_API_URL = 'https://generativelanguage.googleapis.com/v1/interactions';
+const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// Chuỗi model dự phòng theo thứ tự ưu tiên (Interactions API v1)
-const DEFAULT_MODEL_FALLBACK_CHAIN = [
-  'gemini-4-hydrogen',
+// Chuỗi model đa phương thức ổn định trên Gemini API (ưu tiên các bản Flash-Lite siêu tốc, ít quá tải 503)
+const DEFAULT_GEMINI_MODELS = [
   'gemini-3.5-flash-lite',
-  'gemini-4-argon',
   'gemini-3.1-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-4-hydrogen',
+  'gemini-4-argon',
 ];
 
-const SYSTEM_PROMPT = `Bạn là trợ lý đọc chữ (OCR) trên ảnh đơn thuốc tiếng Việt.
-Chỉ đọc chữ thực tế có trên ảnh và trích xuất thành JSON thuần (không dùng markdown code block, không tự bịa lời khuyên y tế) theo đúng cấu trúc:
+const VISIT_SYSTEM_PROMPT = `Bạn là trợ lý đọc chữ (OCR) trên ảnh giấy khám bệnh và đơn thuốc tiếng Việt.
+Chỉ đọc chữ và số thực tế có trên ảnh, KHÔNG tự bịa tên thuốc, chỉ số hay lời khuyên y tế.
+Trả về JSON thuần (không dùng markdown code block) theo đúng cấu trúc:
 {
-  "title": "Tên loại bệnh hoặc tên đơn thuốc (ví dụ: Đơn thuốc Huyết áp & Tim mạch)",
+  "title": "Tên loại bệnh hoặc đợt khám (ví dụ: Khám Huyết áp & Tim mạch)",
   "conditionType": "blood_pressure" | "diabetes" | "general",
-  "medicationsText": "Danh sách các thuốc và liều dùng đọc được từ ảnh (ví dụ: Amlodipine 5mg - Sáng 1 viên, Losartan 50mg - Tối 1 viên)",
+  "medicationsText": "Danh sách các thuốc và liều dùng đọc được, cách nhau bởi dấu phẩy",
   "systolic": 130,
   "diastolic": 85,
-  "bloodSugar": null,
-  "notes": "Ghi chú ngày tái khám hoặc lời dặn ghi trên đơn"
+  "heartRate": 72,
+  "bloodSugar": 5.8,
+  "notes": "Ghi chú ngày tái khám hoặc lời dặn ghi trên giấy"
+}
+Nếu một chỉ số không có trên ảnh, trả về null cho trường đó.`;
+
+const OMRON_SYSTEM_PROMPT = `Bạn là trợ lý đọc số trên màn hình máy đo huyết áp điện tử (ví dụ Omron).
+Chỉ đọc đúng 3 số hiển thị trên màn hình: SYS (huyết áp tâm thu), DIA (huyết áp tâm trương), PULSE (nhịp tim).
+KHÔNG tự bịa số nếu ảnh mờ không đọc được (trả về null).
+Trả về JSON thuần (không dùng markdown code block):
+{
+  "systolic": 118,
+  "diastolic": 78,
+  "pulse": 70
 }`;
+
+const CORS_HEADERS = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 declare const Deno: any;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      },
-    });
+    return new Response('ok', { headers: CORS_HEADERS });
   }
 
   try {
-    // 1. Xác thực JWT thật với Supabase Auth (chặn mọi token giả mạo hoặc đã hết hạn)
+    // 1. Xác thực JWT thật với Supabase Auth
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Thiếu thông tin xác thực JWT hợp lệ' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
       });
     }
 
@@ -61,115 +74,123 @@ Deno.serve(async (req: Request) => {
         },
       });
       if (!userCheckRes.ok) {
-        return new Response(JSON.stringify({ error: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn' }), {
-          status: 401,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return new Response(
+          JSON.stringify({ error: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn' }),
+          { status: 401, headers: CORS_HEADERS }
+        );
       }
     }
 
-    const apiKey = Deno.env.get('GEMINI_API_KEY');
+    const apiKey = (Deno.env.get('GEMINI_API_KEY') || '').trim();
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: 'Chưa cấu hình GEMINI_API_KEY trong Supabase Secrets' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+        { status: 500, headers: CORS_HEADERS }
       );
     }
 
     const body = await req.json();
-    const { imageBase64, mimeType = 'image/jpeg', preferredModel } = body || {};
+    const {
+      mode = 'visit',
+      imageBase64,
+      extraImagesBase64 = [],
+      mimeType = 'image/jpeg',
+      preferredModel,
+    } = body || {};
 
-    // 2. Chỉ chấp nhận đúng định dạng ảnh hợp lệ
+    // 2. Kiểm tra định dạng & giới hạn kích thước ảnh để chống lạm dụng
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedMimeTypes.includes(mimeType)) {
       return new Response(JSON.stringify({ error: 'Định dạng ảnh không được hỗ trợ' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
       });
     }
 
     if (!imageBase64 || typeof imageBase64 !== 'string') {
       return new Response(JSON.stringify({ error: 'Thiếu dữ liệu ảnh cần đọc' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
       });
     }
 
-    // Giới hạn kích thước ảnh (~6MB base64) để chống lạm dụng
-    if (imageBase64.length > 8_000_000) {
-      return new Response(JSON.stringify({ error: 'Kích thước ảnh vượt quá giới hạn cho phép' }), {
-        status: 413,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    const validExtras: string[] = Array.isArray(extraImagesBase64)
+      ? extraImagesBase64
+          .filter((img): img is string => typeof img === 'string' && img.length > 0)
+          .slice(0, 3)
+      : [];
+
+    const allImages = mode === 'omron' ? [imageBase64] : [imageBase64, ...validExtras];
+    const totalLength = allImages.reduce((sum, img) => sum + img.length, 0);
+    if (totalLength > 12_000_000) {
+      return new Response(
+        JSON.stringify({ error: 'Tổng dung lượng ảnh vượt quá giới hạn cho phép' }),
+        { status: 413, headers: CORS_HEADERS }
+      );
     }
 
-    // Xây dựng chuỗi model ưu tiên:
-    // 1. Model truyền từ cấu hình người dùng hoặc biến môi trường GEMINI_MODEL_PRIMARY
-    // 2. Các model trong chuỗi dự phòng mặc định
+    // 3. Xây dựng chuỗi model ưu tiên (ưu tiên gemini-2.5-flash, kèm model tuỳ chọn nếu có)
     const envPrimaryModel = Deno.env.get('GEMINI_MODEL_PRIMARY');
-    const customModels = [preferredModel, envPrimaryModel].filter(
+    const customModels = [envPrimaryModel, preferredModel].filter(
       (m): m is string => typeof m === 'string' && m.trim().length > 0
     );
-    const modelChain = Array.from(new Set([...customModels, ...DEFAULT_MODEL_FALLBACK_CHAIN]));
+    const modelChain = Array.from(new Set([...DEFAULT_GEMINI_MODELS, ...customModels]));
+
+    const systemPrompt = mode === 'omron' ? OMRON_SYSTEM_PROMPT : VISIT_SYSTEM_PROMPT;
+    const userPrompt =
+      mode === 'omron'
+        ? 'Hãy đọc 3 số SYS, DIA, PULSE trên màn hình máy đo huyết áp này và trả về JSON.'
+        : 'Hãy đọc chữ và số trên các ảnh giấy khám / đơn thuốc này và trả về đúng JSON đã yêu cầu.';
 
     let lastError = '';
 
-    // Thử lần lượt từng model trong chuỗi dự phòng (Auto-Fallback)
+    // 4. Gọi Gemini API chuẩn (generativelanguage.googleapis.com) bằng header x-goog-api-key (hỗ trợ cả key AQ. mới lẫn AIza cũ)
     for (const modelName of modelChain) {
       try {
-        const response = await fetch(INTERACTIONS_API_URL, {
+        const res = await fetch(`${GEMINI_API_BASE_URL}/${modelName}:generateContent`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'x-goog-api-key': apiKey,
-            'Api-Revision': '2026-05-20',
           },
           body: JSON.stringify({
-            model: modelName,
-            store: false, // Không lưu ảnh y tế của người dùng trên server AI
-            system_instruction: SYSTEM_PROMPT,
-            input: [
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [
               {
-                type: 'image',
-                data: imageBase64,
-                mime_type: mimeType,
-              },
-              {
-                type: 'text',
-                text: 'Hãy đọc chữ trên ảnh đơn thuốc này và trả về đúng định dạng JSON đã yêu cầu.',
+                role: 'user',
+                parts: [
+                  ...allImages.map((data) => ({
+                    inline_data: { mime_type: mimeType, data },
+                  })),
+                  { text: userPrompt },
+                ],
               },
             ],
           }),
         });
 
-        if (!response.ok) {
-          lastError = `Model ${modelName} trả về HTTP ${response.status}`;
-          continue; // Tự động chuyển sang model dự phòng tiếp theo
-        }
-
-        const interaction = await response.json();
-
-        // Trích xuất text từ model_output step trong interaction.steps
-        let outputText = interaction?.output_text || '';
-        if (!outputText && Array.isArray(interaction?.steps)) {
-          for (let i = interaction.steps.length - 1; i >= 0; i--) {
-            const step = interaction.steps[i];
-            if (step?.type === 'model_output' && Array.isArray(step?.content)) {
-              const textPart = step.content.find((c: any) => c?.type === 'text' && c?.text);
-              if (textPart) {
-                outputText = textPart.text;
-                break;
-              }
-            }
+        if (!res.ok) {
+          let reason = '';
+          try {
+            const errBody = await res.json();
+            reason = errBody?.error?.message
+              ? `: ${String(errBody.error.message).slice(0, 160)}`
+              : '';
+          } catch {
+            // Bỏ qua nếu không parse được JSON lỗi
           }
-        }
-
-        if (!outputText) {
-          lastError = `Model ${modelName} không trả về nội dung text`;
+          lastError = `${modelName} HTTP ${res.status}${reason}`;
           continue;
         }
 
-        const cleanedJson = outputText
+        const json = await res.json();
+        const textPart = json?.candidates?.[0]?.content?.parts?.find((p: any) => p?.text);
+        if (!textPart?.text) {
+          lastError = `${modelName} không trả về nội dung text`;
+          continue;
+        }
+
+        const cleanedJson = String(textPart.text)
           .replace(/^```json\s*/i, '')
           .replace(/^```\s*/i, '')
           .replace(/```\s*$/i, '')
@@ -183,31 +204,25 @@ Deno.serve(async (req: Request) => {
             usedModel: modelName,
             fallbackUsed: modelName !== modelChain[0],
           }),
-          {
-            status: 200,
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
-            },
-          }
+          { status: 200, headers: CORS_HEADERS }
         );
       } catch (err: any) {
         lastError = err?.message || `Lỗi khi gọi model ${modelName}`;
-        continue; // Chuyển sang model dự phòng tiếp theo
+        continue;
       }
     }
 
     return new Response(
       JSON.stringify({
-        error: 'Tất cả các model trong chuỗi dự phòng đều không phản hồi',
+        error: 'Không gọi được Gemini API',
         detail: lastError,
       }),
-      { status: 502, headers: { 'Content-Type': 'application/json' } }
+      { status: 502, headers: CORS_HEADERS }
     );
   } catch (err: any) {
     return new Response(
       JSON.stringify({ error: 'Lỗi xử lý yêu cầu OCR', detail: err?.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
 });
